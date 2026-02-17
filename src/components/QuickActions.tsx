@@ -51,7 +51,6 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
   const [isDirty, setIsDirty] = useState(false);
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const [toast, setToast] = useState<(ToastInput & { id: number }) | null>(null);
-  const [sessionDateAck, setSessionDateAck] = useState(false);
   const [menuAnimatingOut, setMenuAnimatingOut] = useState(false);
   const closeMenuTimer = useRef<number | null>(null);
 
@@ -141,7 +140,6 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     setMenuAnimatingOut(false);
     if (type === "session") {
       setSessionForm(defaultSessionForm());
-      setSessionDateAck(false);
     }
     if (type === "task") {
       setTaskForm(defaultTaskForm());
@@ -181,7 +179,6 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
       if (!ok) return;
     }
     setIsDirty(false);
-    setSessionDateAck(false);
     setOpenAction(null);
   }
 
@@ -216,7 +213,6 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     const data = (await res.json()) as { sessionId: string };
 
     setIsDirty(false);
-    setSessionDateAck(false);
     setOpenAction(null);
     router.push("/");
     showToast({
@@ -347,7 +343,6 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                 value={sessionForm.date}
                 onChange={(next) => {
                   setSessionForm((prev) => ({ ...prev, date: next }));
-                  setSessionDateAck(false);
                   setIsDirty(true);
                 }}
               />
@@ -357,22 +352,13 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
               onClick={() => {
                 const now = new Date();
                 setSessionForm((prev) => ({ ...prev, date: toDateInput(now) }));
-                setSessionDateAck(false);
                 setIsDirty(true);
               }}
               className="app-btn app-btn-secondary text-xs"
             >
               היום
             </button>
-            <button
-              type="button"
-              onClick={() => setSessionDateAck(true)}
-              className="app-btn app-btn-primary text-xs"
-            >
-              אישור
-            </button>
           </div>
-          {sessionDateAck ? <p className="text-xs text-accent">התאריך אושר</p> : null}
 
           <div className="space-y-1">
             <span className="text-xs text-muted">שעת מפגש</span>

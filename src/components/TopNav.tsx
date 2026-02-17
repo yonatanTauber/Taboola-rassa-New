@@ -2,29 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnalogClock } from "@/components/AnalogClock";
 import { AppLogo } from "@/components/AppLogo";
 import { QuickAddControl } from "@/components/QuickAddControl";
 import { useQuickActions } from "@/components/QuickActions";
 
-const ITEMS = [
+const PRIMARY_ITEMS = [
   { href: "/", label: "דשבורד" },
   { href: "/patients", label: "מטופלים" },
   { href: "/sessions", label: "פגישות" },
   { href: "/tasks", label: "משימות" },
+];
+
+const SECONDARY_ITEMS = [
   { href: "/guidance", label: "הדרכות" },
   { href: "/inquiries", label: "פניות" },
   { href: "/receipts", label: "כספים" },
   { href: "/research", label: "מחקר" },
-  { href: "/invites", label: "הזמנות" },
   { href: "/settings", label: "הגדרות" },
 ];
 
-export function TopNav() {
+export function TopNav({ canManageInvites = false }: { canManageInvites?: boolean }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { openAction } = useQuickActions();
+  const items = useMemo(() => {
+    if (!canManageInvites) return [...PRIMARY_ITEMS, ...SECONDARY_ITEMS];
+    return [...PRIMARY_ITEMS, ...SECONDARY_ITEMS.slice(0, -1), { href: "/invites", label: "הזמנות" }, SECONDARY_ITEMS[SECONDARY_ITEMS.length - 1]];
+  }, [canManageInvites]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -54,7 +60,7 @@ export function TopNav() {
         </Link>
 
         <nav className="hidden flex-1 flex-wrap items-center justify-center gap-3 lg:flex-nowrap md:flex">
-          {ITEMS.slice(0, 4).map((item) => {
+          {PRIMARY_ITEMS.map((item) => {
             const active =
               item.href === "/"
                 ? pathname === "/"
@@ -76,7 +82,7 @@ export function TopNav() {
 
           <QuickAddControl />
 
-          {ITEMS.slice(4).map((item) => {
+          {items.slice(PRIMARY_ITEMS.length).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
@@ -122,7 +128,7 @@ export function TopNav() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {ITEMS.map((item) => {
+              {items.map((item) => {
                 const active =
                   item.href === "/"
                     ? pathname === "/"

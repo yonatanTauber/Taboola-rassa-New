@@ -4,6 +4,9 @@ import { BackButton } from "@/components/BackButton";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 
+const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
+
 const AVATAR_KEYS = [
   "calm-man",
   "calm-woman",
@@ -16,6 +19,17 @@ const AVATAR_KEYS = [
   "neutral-1",
   "neutral-2",
 ];
+
+function toDateInput(date: Date) {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function parseDateInput(raw: string) {
+  if (!raw) return null;
+  const parsed = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
 
 async function generateInternalCode() {
   const year = new Date().getFullYear();
@@ -46,8 +60,10 @@ async function createPatient(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const gender = String(formData.get("gender") ?? "OTHER");
   const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
+  const treatmentStartDateRaw = String(formData.get("treatmentStartDate") ?? "").trim();
   const fixedSessionDay = String(formData.get("fixedSessionDay") ?? "").trim();
-  const fixedSessionTime = String(formData.get("fixedSessionTime") ?? "").trim();
+  const fixedSessionHour = String(formData.get("fixedSessionHour") ?? "").trim();
+  const fixedSessionMinute = String(formData.get("fixedSessionMinute") ?? "").trim();
   const defaultSessionFeeNis = Number(formData.get("defaultSessionFeeNis") ?? 0);
   const referralReason = String(formData.get("referralReason") ?? "").trim();
   const goals = String(formData.get("goals") ?? "").trim();
@@ -62,10 +78,16 @@ async function createPatient(formData: FormData) {
 
   const parsedFixedDay = fixedSessionDay !== "" ? Number(fixedSessionDay) : null;
   const parsedFee = Number.isFinite(defaultSessionFeeNis) && defaultSessionFeeNis > 0 ? defaultSessionFeeNis : null;
-  const parsedDateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+  const parsedDateOfBirth = dateOfBirth ? parseDateInput(dateOfBirth) : null;
+  const parsedTreatmentStartDate = treatmentStartDateRaw
+    ? parseDateInput(treatmentStartDateRaw)
+    : new Date();
 
-  if (parsedDateOfBirth && Number.isNaN(parsedDateOfBirth.getTime())) {
+  if (dateOfBirth && !parsedDateOfBirth) {
     redirect("/patients/new?error=invalid-birth-date");
+  }
+  if (treatmentStartDateRaw && !parsedTreatmentStartDate) {
+    redirect("/patients/new?error=invalid-treatment-start-date");
   }
 
   if (
@@ -74,6 +96,19 @@ async function createPatient(formData: FormData) {
   ) {
     redirect("/patients/new?error=invalid-fixed-day");
   }
+
+  const hasFixedTimePart = fixedSessionHour !== "" || fixedSessionMinute !== "";
+  if (parsedFixedDay === null && hasFixedTimePart) {
+    redirect("/patients/new?error=invalid-fixed-time");
+  }
+  if (parsedFixedDay !== null) {
+    if (!HOURS.includes(fixedSessionHour) || !MINUTES.includes(fixedSessionMinute)) {
+      redirect("/patients/new?error=invalid-fixed-time");
+    }
+  }
+
+  const normalizedFixedTime =
+    parsedFixedDay !== null ? `${fixedSessionHour}:${fixedSessionMinute}` : null;
 
   try {
     const internalCode = await generateInternalCode();
@@ -93,9 +128,9 @@ async function createPatient(formData: FormData) {
         avatarKey: AVATAR_KEYS[Math.floor(Math.random() * AVATAR_KEYS.length)],
         defaultSessionFeeNis: parsedFee,
         dateOfBirth: parsedDateOfBirth,
-        treatmentStartDate: new Date(),
+        treatmentStartDate: parsedTreatmentStartDate ?? new Date(),
         fixedSessionDay: parsedFixedDay,
-        fixedSessionTime: fixedSessionTime || null,
+        fixedSessionTime: normalizedFixedTime,
       },
     });
 
@@ -123,7 +158,9 @@ async function createPatient(formData: FormData) {
 function errorText(errorCode?: string) {
   if (errorCode === "missing-required") return "יש להשלים שם פרטי, שם משפחה וטלפון.";
   if (errorCode === "invalid-birth-date") return "תאריך הלידה שהוזן אינו תקין.";
+  if (errorCode === "invalid-treatment-start-date") return "תאריך התחלת הטיפול אינו תקין.";
   if (errorCode === "invalid-fixed-day") return "יום קבוע לפגישה אינו תקין.";
+  if (errorCode === "invalid-fixed-time") return "השעה הקבועה לפגישה אינה תקינה.";
   if (errorCode === "create-failed") return "שמירת המטופל נכשלה. נסה שוב.";
   return null;
 }
@@ -135,6 +172,7 @@ export default async function NewPatientPage({
 }) {
   const query = await searchParams;
   const error = errorText(query.error);
+  const defaultTreatmentStartDate = toDateInput(new Date());
   return (
     <main className="space-y-4">
       <BackButton fallback="/patients" />
@@ -160,20 +198,53 @@ export default async function NewPatientPage({
               <div className="text-xs text-muted">תאריך לידה</div>
               <input name="dateOfBirth" type="date" lang="he-IL" className="app-field" />
             </label>
-            <div className="rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-xs text-muted">
-              תאריך התחלת טיפול ייקבע אוטומטית לפי מועד פתיחת המטופל במערכת
+            <label className="space-y-1">
+              <div className="text-xs text-muted">תאריך התחלת טיפול</div>
+              <input
+                name="treatmentStartDate"
+                type="date"
+                lang="he-IL"
+                defaultValue={defaultTreatmentStartDate}
+                className="app-field"
+              />
+            </label>
+
+            <div className="space-y-2 rounded-xl border border-black/12 bg-black/[0.02] p-3 md:col-span-2">
+              <div className="text-xs text-muted">יום ושעה קבועים (אופציונלי)</div>
+              <div className="grid gap-2 md:grid-cols-[1fr_auto_auto] md:items-end">
+                <select name="fixedSessionDay" className="app-select">
+                  <option value="">ללא יום קבוע</option>
+                  <option value="1">יום ראשון</option>
+                  <option value="2">יום שני</option>
+                  <option value="3">יום שלישי</option>
+                  <option value="4">יום רביעי</option>
+                  <option value="5">יום חמישי</option>
+                  <option value="6">יום שישי</option>
+                  <option value="0">שבת</option>
+                </select>
+                <div className="flex items-end gap-2">
+                  <label className="sr-only">דקות קבועות</label>
+                  <select name="fixedSessionMinute" className="app-select app-time-select">
+                    <option value="">דקות</option>
+                    {MINUTES.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pb-2 text-sm text-muted">:</span>
+                  <label className="sr-only">שעה קבועה</label>
+                  <select name="fixedSessionHour" className="app-select app-time-select">
+                    <option value="">שעה</option>
+                    {HOURS.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-            <select name="fixedSessionDay" className="app-select">
-              <option value="">יום קבוע לפגישה (אופציונלי)</option>
-              <option value="1">יום ראשון</option>
-              <option value="2">יום שני</option>
-              <option value="3">יום שלישי</option>
-              <option value="4">יום רביעי</option>
-              <option value="5">יום חמישי</option>
-              <option value="6">יום שישי</option>
-              <option value="0">שבת</option>
-            </select>
-            <input name="fixedSessionTime" type="time" step={300} className="app-field" />
             <input
               name="defaultSessionFeeNis"
               type="number"

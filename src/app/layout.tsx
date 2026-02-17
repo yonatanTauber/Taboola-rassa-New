@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Caveat, Heebo, IBM_Plex_Mono } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { QuickActionsProvider } from "@/components/QuickActions";
+import { isAdminEmail } from "@/lib/admin";
+import { getCurrentUser } from "@/lib/auth-server";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -26,16 +28,19 @@ export const metadata: Metadata = {
   description: "פלטפורמת ניהול קליניקה ומחקר למטפלים",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getCurrentUser();
+  const canManageInvites = isAdminEmail(user?.email);
+
   return (
     <html lang="he" dir="rtl">
       <body className={`${heebo.variable} ${plexMono.variable} ${caveat.variable} antialiased`}>
         <QuickActionsProvider>
-          <AppShell>{children}</AppShell>
+          <AppShell canManageInvites={canManageInvites}>{children}</AppShell>
         </QuickActionsProvider>
       </body>
     </html>

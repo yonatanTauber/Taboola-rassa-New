@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 import { TopNav } from "@/components/TopNav";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, canManageInvites = false }: { children: ReactNode; canManageInvites?: boolean }) {
   const pathname = usePathname();
   const authPage = pathname === "/login" || pathname === "/register";
 
@@ -37,7 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen overflow-x-clip p-2 md:p-4">
       <a href="#main-content" className="skip-link">דלג לתוכן</a>
       <div className="mx-auto flex w-full max-w-[1760px] flex-col gap-3">
-        <TopNav />
+        <TopNav canManageInvites={canManageInvites} />
         <main id="main-content" className={`surface-card min-h-[calc(100vh-7.5rem)] overflow-x-clip rounded-2xl border border-black/14 p-3 md:p-5 ${toneClass}`}>
           {children}
         </main>

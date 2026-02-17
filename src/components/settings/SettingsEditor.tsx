@@ -59,7 +59,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   aiLinkSuggestions: true,
 };
 
-export function SettingsEditor({ initialProfile }: { initialProfile?: SettingsProfile }) {
+export function SettingsEditor({ initialProfile, canManageInvites = false }: { initialProfile?: SettingsProfile; canManageInvites?: boolean }) {
   const { showToast } = useQuickActions();
   const [settings, setSettings] = useState<SettingsState>(() => buildDefaultSettings(initialProfile));
 
@@ -137,9 +137,11 @@ export function SettingsEditor({ initialProfile }: { initialProfile?: SettingsPr
 
       <section className="app-section flex flex-wrap gap-2">
         <button className="app-btn app-btn-primary" onClick={save}>שמור הגדרות</button>
-        <Link href="/invites" className="app-btn app-btn-secondary">
-          ניהול הזמנות משתמשים
-        </Link>
+        {canManageInvites ? (
+          <Link href="/invites" className="app-btn app-btn-secondary">
+            ניהול הזמנות משתמשים
+          </Link>
+        ) : null}
       </section>
     </main>
   );
