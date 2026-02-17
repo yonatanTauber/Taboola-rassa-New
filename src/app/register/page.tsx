@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [profession, setProfession] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,7 +24,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fullName, email, password, profession, dateOfBirth }),
+      body: JSON.stringify({ fullName, email, password, profession, dateOfBirth, inviteCode }),
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({ error: "לא ניתן להשלים הרשמה כרגע." }))) as { error?: string };
@@ -97,6 +98,18 @@ export default function RegisterPage() {
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
               className="app-field mt-1"
+            />
+          </label>
+          <label className="block text-sm text-muted md:col-span-2">
+            קוד הזמנה (אם נדרש)
+            <input
+              type="text"
+              name="inviteCode"
+              autoComplete="off"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              className="app-field mt-1"
+              placeholder="הכנס/י קוד הזמנה"
             />
           </label>
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, sessionCookieName, sessionMaxAgeSeconds, signSessionToken } from "@/lib/auth";
+import { getRegistrationMode, isValidInviteCode, requiresInviteCode } from "@/lib/registration";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,7 @@ export async function POST(req: Request) {
       password?: string;
       profession?: string;
       dateOfBirth?: string;
+      inviteCode?: string;
     };
 
     const fullName = String(body.fullName ?? "").trim();
@@ -19,6 +21,15 @@ export async function POST(req: Request) {
     const password = String(body.password ?? "");
     const profession = String(body.profession ?? "").trim();
     const dateOfBirthRaw = String(body.dateOfBirth ?? "").trim();
+    const inviteCode = String(body.inviteCode ?? "");
+
+    const registrationMode = getRegistrationMode();
+    if (registrationMode === "closed") {
+      return NextResponse.json({ error: "הרשמה חדשה סגורה כרגע." }, { status: 403 });
+    }
+    if (requiresInviteCode() && !isValidInviteCode(inviteCode)) {
+      return NextResponse.json({ error: "קוד ההזמנה לא תקין." }, { status: 403 });
+    }
 
     if (!fullName || !email || !password) {
       return NextResponse.json({ error: "יש למלא שם מלא, מייל וסיסמה." }, { status: 400 });

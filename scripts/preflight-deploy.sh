@@ -37,6 +37,15 @@ if [[ "${NODE_ENV:-development}" == "production" ]]; then
 fi
 pass "DATABASE_URL sanity check passed"
 
+if [ "${NODE_ENV:-development}" == "production" ]; then
+  mode="${REGISTRATION_MODE:-invite}"
+  if [ "$mode" == "open" ]; then
+    echo "[WARN] REGISTRATION_MODE=open in production"
+  else
+    pass "REGISTRATION_MODE=$mode"
+  fi
+fi
+
 if [ -d node_modules ]; then
   pass "node_modules exists"
 else
