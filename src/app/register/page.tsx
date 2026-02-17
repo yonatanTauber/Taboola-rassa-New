@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppLogo } from "@/components/AppLogo";
 
+const PROFESSION_OPTIONS = [
+  "מטפל/ת באמנויות",
+  "פסיכותרפיסט/ית",
+  "פסיכולוג/ית קליני/ת",
+  "עובד/ת סוציאלי/ת קליני/ת",
+  "פסיכיאטר/ית",
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
@@ -78,15 +86,22 @@ export default function RegisterPage() {
 
           <label className="block text-sm text-muted">
             מקצוע
-            <input
-              type="text"
+            <select
               name="profession"
-              autoComplete="organization-title"
+              required
               value={profession}
               onChange={(e) => setProfession(e.target.value)}
-              className="app-field mt-1"
-              placeholder="פסיכולוג קליני"
-            />
+              className="app-select mt-1"
+            >
+              <option value="" disabled>
+                בחר/י מקצוע
+              </option>
+              {PROFESSION_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="block text-sm text-muted">

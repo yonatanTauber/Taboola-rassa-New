@@ -28,6 +28,11 @@ type SettingsState = {
   aiLinkSuggestions: boolean;
 };
 
+type SettingsProfile = {
+  therapistName?: string;
+  email?: string;
+};
+
 const STORAGE_KEY = "tabula.settings.v1";
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -54,9 +59,9 @@ const DEFAULT_SETTINGS: SettingsState = {
   aiLinkSuggestions: true,
 };
 
-export function SettingsEditor() {
+export function SettingsEditor({ initialProfile }: { initialProfile?: SettingsProfile }) {
   const { showToast } = useQuickActions();
-  const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<SettingsState>(() => buildDefaultSettings(initialProfile));
 
   useEffect(() => {
     try {
@@ -64,13 +69,27 @@ export function SettingsEditor() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<SettingsState>;
       const timer = window.setTimeout(() => {
-        setSettings((prev) => ({ ...prev, ...parsed }));
+        setSettings((prev) => {
+          const next = { ...prev, ...parsed };
+          const parsedEmail = typeof parsed.email === "string" ? parsed.email.trim() : "";
+          const parsedTherapistName = typeof parsed.therapistName === "string" ? parsed.therapistName.trim() : "";
+
+          if (!parsedEmail || parsedEmail === DEFAULT_SETTINGS.email) {
+            const profileEmail = initialProfile?.email?.trim().toLowerCase();
+            if (profileEmail) next.email = profileEmail;
+          }
+          if (!parsedTherapistName || parsedTherapistName === DEFAULT_SETTINGS.therapistName) {
+            const profileName = initialProfile?.therapistName?.trim();
+            if (profileName) next.therapistName = profileName;
+          }
+          return next;
+        });
       }, 0);
       return () => window.clearTimeout(timer);
     } catch {
       return;
     }
-  }, []);
+  }, [initialProfile]);
 
   function save() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -151,4 +170,14 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
     </label>
   );
+}
+
+function buildDefaultSettings(initialProfile?: SettingsProfile): SettingsState {
+  const therapistName = initialProfile?.therapistName?.trim();
+  const email = initialProfile?.email?.trim().toLowerCase();
+  return {
+    ...DEFAULT_SETTINGS,
+    therapistName: therapistName || DEFAULT_SETTINGS.therapistName,
+    email: email || DEFAULT_SETTINGS.email,
+  };
 }
