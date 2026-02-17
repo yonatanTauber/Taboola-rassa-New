@@ -1,14 +1,25 @@
 import { InviteCodesWorkspace } from "@/components/invites/InviteCodesWorkspace";
-import { requireCurrentUserId } from "@/lib/auth-server";
+import { getCurrentUser } from "@/lib/auth-server";
+import { isAdminEmail } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { getRegistrationMode } from "@/lib/registration";
 
 export default async function InvitesPage() {
-  const userId = await requireCurrentUserId();
-  if (!userId) return null;
+  const user = await getCurrentUser();
+  if (!user) return null;
+  if (!isAdminEmail(user.email)) {
+    return (
+      <main className="space-y-3">
+        <section className="app-section">
+          <h1 className="text-xl font-semibold text-ink">הזמנות משתמשים</h1>
+          <p className="mt-2 text-sm text-muted">אין לך הרשאה לניהול הזמנות. רק משתמש אדמין יכול ליצור הזמנות.</p>
+        </section>
+      </main>
+    );
+  }
 
   const invites = await prisma.inviteCode.findMany({
-    where: { ownerUserId: userId },
+    where: { ownerUserId: user.id },
     orderBy: { createdAt: "desc" },
     take: 500,
     select: {

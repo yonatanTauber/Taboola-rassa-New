@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { requireCurrentUserId } from "@/lib/auth-server";
+import { getCurrentUser } from "@/lib/auth-server";
+import { isAdminEmail } from "@/lib/admin";
 import { createInviteCode, normalizeInviteEmail } from "@/lib/invite-codes";
 import { prisma } from "@/lib/prisma";
 import { getRegistrationMode } from "@/lib/registration";
@@ -11,11 +12,14 @@ const MAX_EXPIRY_DAYS = 365;
 const CREATE_RETRIES = 6;
 
 export async function GET() {
-  const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminEmail(user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const invites = await prisma.inviteCode.findMany({
-    where: { ownerUserId: userId },
+    where: { ownerUserId: user.id },
     orderBy: { createdAt: "desc" },
     take: 500,
     select: {
@@ -53,8 +57,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminEmail(user.email)) {
+    return NextResponse.json({ error: "רק אדמין יכול ליצור הזמנות." }, { status: 403 });
+  }
 
   const body = (await req.json().catch(() => ({}))) as {
     invitedEmail?: string;
@@ -76,7 +83,7 @@ export async function POST(req: Request) {
     try {
       const created = await prisma.inviteCode.create({
         data: {
-          ownerUserId: userId,
+          ownerUserId: user.id,
           code: createInviteCode(),
           invitedEmail,
           expiresAt,

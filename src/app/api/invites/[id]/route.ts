@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireCurrentUserId } from "@/lib/auth-server";
+import { getCurrentUser } from "@/lib/auth-server";
+import { isAdminEmail } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminEmail(user.email)) {
+    return NextResponse.json({ error: "רק אדמין יכול לבטל הזמנות." }, { status: 403 });
+  }
 
   const { id } = await params;
   const existing = await prisma.inviteCode.findFirst({
-    where: { id, ownerUserId: userId },
+    where: { id, ownerUserId: user.id },
     select: {
       id: true,
       usedAt: true,
