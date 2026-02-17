@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireCurrentUserId } from "@/lib/auth-server";
 
 function guessTopicsFromText(text: string) {
   const source = text.toLowerCase();
@@ -21,6 +22,9 @@ function extractYouTubeTitleSeed(url: URL) {
 }
 
 export async function POST(req: Request) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
   const rawUrl = String(body.url ?? "").trim();
   if (!rawUrl) return NextResponse.json({ error: "Missing url" }, { status: 400 });

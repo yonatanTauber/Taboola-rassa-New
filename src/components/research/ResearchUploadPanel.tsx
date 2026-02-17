@@ -53,6 +53,7 @@ export function ResearchUploadPanel({
   const canSave =
     (Boolean(file) || Boolean(externalUrl.trim())) &&
     Boolean(title.trim()) &&
+    Boolean(patientId) &&
     !saving;
 
   const selectedPatientName = useMemo(
@@ -126,6 +127,10 @@ export function ResearchUploadPanel({
     if (!title.trim()) return;
     if (entryType === "ARTICLE_FILE" && !file) return;
     if (entryType !== "ARTICLE_FILE" && !externalUrl.trim()) return;
+    if (!patientId) {
+      showToast({ message: "יש לבחור מטופל לפני שמירה." });
+      return;
+    }
 
     setSaving(true);
     const body = new FormData();

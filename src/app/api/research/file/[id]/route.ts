@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { ResearchTargetType } from "@prisma/client";
+import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
+import { listOwnedPatientIds } from "@/lib/research-access";
 
 const MIME_BY_EXT: Record<string, string> = {
   pdf: "application/pdf",
@@ -15,9 +18,23 @@ const MIME_BY_EXT: Record<string, string> = {
 };
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
-  const doc = await prisma.researchDocument.findUnique({
-    where: { id },
+  const ownedPatientIds = await listOwnedPatientIds(userId);
+  if (ownedPatientIds.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const doc = await prisma.researchDocument.findFirst({
+    where: {
+      id,
+      links: {
+        some: {
+          targetEntityType: ResearchTargetType.PATIENT,
+          targetEntityId: { in: ownedPatientIds },
+        },
+      },
+    },
     select: { filePath: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });

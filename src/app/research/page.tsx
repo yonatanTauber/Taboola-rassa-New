@@ -1,4 +1,5 @@
 import { ResearchWorkspace } from "@/components/research/ResearchWorkspace";
+import { requireCurrentUserId } from "@/lib/auth-server";
 import { formatPatientName } from "@/lib/patient-name";
 import { prisma } from "@/lib/prisma";
 import { ResearchTargetType } from "@prisma/client";
@@ -8,6 +9,9 @@ export default async function ResearchPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return null;
+
   const params = (await searchParams) ?? {};
   const initialFilters = {
     q: typeof params.q === "string" ? params.q : "",
@@ -16,28 +20,52 @@ export default async function ResearchPage({
     author: typeof params.author === "string" ? params.author : "ALL",
   };
 
-  const [docs, patients, authors, topics, sources] = await Promise.all([
-    prisma.researchDocument.findMany({
-      include: {
-        authors: { include: { author: true } },
-        topics: { include: { topic: true } },
-        links: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-    prisma.patient.findMany({
-      where: { archivedAt: null },
-      select: { id: true, firstName: true, lastName: true },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      take: 400,
-    }),
-    prisma.author.findMany({ orderBy: { name: "asc" }, take: 400 }),
-    prisma.topic.findMany({ orderBy: { name: "asc" }, take: 400 }),
-    prisma.researchSource.findMany({ orderBy: { name: "asc" }, take: 400 }),
-  ]);
+  const patients = await prisma.patient.findMany({
+    where: { ownerUserId: userId, archivedAt: null },
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    take: 400,
+  });
+  const ownedPatientIds = patients.map((patient) => patient.id);
+
+  const docs =
+    ownedPatientIds.length > 0
+      ? await prisma.researchDocument.findMany({
+          where: {
+            links: {
+              some: {
+                targetEntityType: ResearchTargetType.PATIENT,
+                targetEntityId: { in: ownedPatientIds },
+              },
+            },
+          },
+          include: {
+            authors: { include: { author: true } },
+            topics: { include: { topic: true } },
+            links: true,
+            sourceRef: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 200,
+        })
+      : [];
 
   const patientMap = new Map(patients.map((p) => [p.id, p]));
+  const authorMap = new Map<string, { id: string; name: string }>();
+  const topicMap = new Map<string, { id: string; name: string }>();
+  const sourceMap = new Map<string, { id: string; name: string }>();
+
+  for (const doc of docs) {
+    for (const item of doc.authors) {
+      authorMap.set(item.author.id, { id: item.author.id, name: item.author.name });
+    }
+    for (const item of doc.topics) {
+      topicMap.set(item.topic.id, { id: item.topic.id, name: item.topic.name });
+    }
+    if (doc.sourceId && doc.sourceRef?.name) {
+      sourceMap.set(doc.sourceId, { id: doc.sourceId, name: doc.sourceRef.name });
+    }
+  }
 
   return (
     <ResearchWorkspace
@@ -62,9 +90,9 @@ export default async function ResearchPage({
           })),
       }))}
       patients={patients.map((p) => ({ id: p.id, name: formatPatientName(p.firstName, p.lastName) }))}
-      authorsCatalog={authors.map((a) => ({ id: a.id, name: a.name }))}
-      topicsCatalog={topics.map((t) => ({ id: t.id, name: t.name }))}
-      sourcesCatalog={sources.map((s) => ({ id: s.id, name: s.name }))}
+      authorsCatalog={[...authorMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
+      topicsCatalog={[...topicMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
+      sourcesCatalog={[...sourceMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
       initialFilters={initialFilters}
     />
   );

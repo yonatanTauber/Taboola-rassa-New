@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 import { ResearchTargetType } from "@prisma/client";
 import { extractResearchMetadata } from "@/lib/research-extract";
@@ -13,6 +14,9 @@ function parseCommaList(raw: string) {
 }
 
 export async function POST(req: Request) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const formData = await req.formData();
   const file = formData.get("file");
   const externalUrl = String(formData.get("externalUrl") ?? "").trim();
@@ -26,6 +30,16 @@ export async function POST(req: Request) {
 
   const source = String(formData.get("source") ?? "").trim();
   const patientId = String(formData.get("patientId") ?? "").trim();
+  if (!patientId) {
+    return NextResponse.json({ error: "יש לבחור מטופל לקישור המחקר." }, { status: 400 });
+  }
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, ownerUserId: userId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!patient) {
+    return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+  }
   const workspaceNotes = String(formData.get("workspaceNotes") ?? "").trim();
   const kind =
     kindRaw === "ARTICLE" ||
@@ -118,14 +132,12 @@ export async function POST(req: Request) {
             })),
           }
         : undefined,
-      links: patientId
-        ? {
-            create: {
-              targetEntityType: ResearchTargetType.PATIENT,
-              targetEntityId: patientId,
-            },
-          }
-        : undefined,
+      links: {
+        create: {
+          targetEntityType: ResearchTargetType.PATIENT,
+          targetEntityId: patientId,
+        },
+      },
     },
   });
 

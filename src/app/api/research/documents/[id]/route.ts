@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
+import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
+import { isResearchDocumentOwnedByUser } from "@/lib/research-access";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
+    const canAccess = await isResearchDocumentOwnedByUser(userId, id);
+    if (!canAccess) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
     const body = await req.json();
     const workspaceNotes = String(body.workspaceNotes ?? "");
 

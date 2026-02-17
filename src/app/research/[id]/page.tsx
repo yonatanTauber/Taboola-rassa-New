@@ -10,11 +10,28 @@ import { ResearchTargetType } from "@prisma/client";
 
 export default async function ResearchDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const userId = await requireCurrentUserId();
+  if (!userId) return notFound();
   const { id } = await params;
 
-  const [document, annotations, patients, topics, otherDocuments] = await Promise.all([
-    prisma.researchDocument.findUnique({
-      where: { id },
+  const patients = await prisma.patient.findMany({
+    where: { ownerUserId: userId, archivedAt: null },
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+  });
+  const ownedPatientIds = patients.map((patient) => patient.id);
+  if (ownedPatientIds.length === 0) return notFound();
+
+  const [document, annotations, topics, otherDocuments] = await Promise.all([
+    prisma.researchDocument.findFirst({
+      where: {
+        id,
+        links: {
+          some: {
+            targetEntityType: ResearchTargetType.PATIENT,
+            targetEntityId: { in: ownedPatientIds },
+          },
+        },
+      },
       include: {
         authors: { include: { author: true } },
         topics: { include: { topic: true } },
@@ -29,24 +46,33 @@ export default async function ResearchDocumentPage({ params }: { params: Promise
             targetEntityId: id,
           },
         },
+        AND: {
+          links: {
+            some: {
+              targetEntityType: ResearchTargetType.PATIENT,
+              targetEntityId: { in: ownedPatientIds },
+            },
+          },
+        },
       },
       include: { links: true },
       orderBy: { updatedAt: "desc" },
       take: 200,
     }),
-    userId
-      ? prisma.patient.findMany({
-          where: { ownerUserId: userId, archivedAt: null },
-          select: { id: true, firstName: true, lastName: true },
-          orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-        })
-      : Promise.resolve([]),
     prisma.topic.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
     prisma.researchDocument.findMany({
-      where: { id: { not: id } },
+      where: {
+        id: { not: id },
+        links: {
+          some: {
+            targetEntityType: ResearchTargetType.PATIENT,
+            targetEntityId: { in: ownedPatientIds },
+          },
+        },
+      },
       select: { id: true, title: true },
       orderBy: { updatedAt: "desc" },
       take: 100,
@@ -69,13 +95,21 @@ export default async function ResearchDocumentPage({ params }: { params: Promise
   const [linkedPatients, linkedDocs] = await Promise.all([
     patientIds.size > 0
       ? prisma.patient.findMany({
-          where: { id: { in: [...patientIds] } },
+          where: { id: { in: [...patientIds] }, ownerUserId: userId },
           select: { id: true, firstName: true, lastName: true },
         })
       : Promise.resolve([]),
     docIds.size > 0
       ? prisma.researchDocument.findMany({
-          where: { id: { in: [...docIds] } },
+          where: {
+            id: { in: [...docIds] },
+            links: {
+              some: {
+                targetEntityType: ResearchTargetType.PATIENT,
+                targetEntityId: { in: ownedPatientIds },
+              },
+            },
+          },
           select: { id: true, title: true },
         })
       : Promise.resolve([]),

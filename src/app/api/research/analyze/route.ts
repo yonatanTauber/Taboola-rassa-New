@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
+import { requireCurrentUserId } from "@/lib/auth-server";
 import { extractResearchMetadata } from "@/lib/research-extract";
 
 export async function POST(req: Request) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const formData = await req.formData();
   const file = formData.get("file");
 
