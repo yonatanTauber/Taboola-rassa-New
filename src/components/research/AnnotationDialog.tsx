@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useQuickActions } from "@/components/QuickActions";
 import { NoteTagsPicker, type LinkableEntity, type LinkableCategories } from "./NoteTagsPicker";
 import { addDocumentAnnotation, updateDocumentAnnotation } from "@/app/research/[id]/actions";
 import type { Annotation } from "./AnnotationCard";
@@ -40,6 +41,7 @@ export function AnnotationDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { showToast } = useQuickActions();
   const isEdit = annotation !== null;
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
@@ -111,7 +113,7 @@ export function AnnotationDialog({
           const payload = (await res.json()) as { error?: string };
           if (payload.error) message = payload.error;
         } catch {}
-        window.alert(message);
+        showToast({ message });
         return;
       }
       setDeleteOpen(false);

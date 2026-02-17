@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EntityLink } from "@/components/EntityLink";
 import { PatientProfileEditor } from "@/components/patients/PatientProfileEditor";
+import { useQuickActions } from "@/components/QuickActions";
 
 type FigureRow = { id: string; name: string };
 type ConceptLinkRow = { id: string; label: string; href: string | null };
@@ -71,6 +72,7 @@ export function PatientAdditionalGrid({
   notes: NoteRow[];
 }) {
   const router = useRouter();
+  const { showToast } = useQuickActions();
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [activeNote, setActiveNote] = useState<ActiveNote | null>(null);
   const [savingNote, setSavingNote] = useState(false);
@@ -102,7 +104,7 @@ export function PatientAdditionalGrid({
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "מחיקה נכשלה";
-      window.alert(`מחיקת הפתק נכשלה: ${message}`);
+      showToast({ message: `מחיקת הפתק נכשלה: ${message}` });
     } finally {
       setDeletingKey((prev) => (prev === key ? null : prev));
     }
@@ -111,7 +113,7 @@ export function PatientAdditionalGrid({
   async function saveActiveNote() {
     if (!activeNote) return;
     if (!noteDraft.title.trim()) {
-      window.alert("חובה להזין כותרת.");
+      showToast({ message: "חובה להזין כותרת." });
       return;
     }
     setSavingNote(true);
@@ -146,7 +148,7 @@ export function PatientAdditionalGrid({
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "שמירה נכשלה";
-      window.alert(`שמירת הפתק נכשלה: ${message}`);
+      showToast({ message: `שמירת הפתק נכשלה: ${message}` });
     } finally {
       setSavingNote(false);
     }
@@ -166,7 +168,7 @@ export function PatientAdditionalGrid({
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "מחיקה נכשלה";
-      window.alert(`מחיקת הקישור נכשלה: ${message}`);
+      showToast({ message: `מחיקת הקישור נכשלה: ${message}` });
     } finally {
       setDeletingKey((prev) => (prev === key ? null : prev));
     }

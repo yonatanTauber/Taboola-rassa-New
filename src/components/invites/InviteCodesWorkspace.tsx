@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type InviteRow = {
   id: string;
@@ -30,6 +31,8 @@ export function InviteCodesWorkspace({
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   const activeCount = useMemo(
     () => invites.filter((invite) => statusFor(invite).kind === "ACTIVE").length,
@@ -67,12 +70,12 @@ export function InviteCodesWorkspace({
   }
 
   async function revokeInvite(inviteId: string) {
-    const ok = window.confirm("לבטל את קוד ההזמנה? לאחר הביטול אי אפשר להשתמש בו.");
-    if (!ok) return;
     setError("");
     setMessage("");
+    setRevoking(true);
 
     const res = await fetch(`/api/invites/${inviteId}`, { method: "DELETE" });
+    setRevoking(false);
     const payload = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
       setError(payload.error ?? "ביטול קוד הזמנה נכשל.");
@@ -85,6 +88,7 @@ export function InviteCodesWorkspace({
           : item,
       ),
     );
+    setRevokeTargetId(null);
     setMessage("קוד ההזמנה בוטל.");
   }
 
@@ -196,7 +200,7 @@ export function InviteCodesWorkspace({
                           <button
                             type="button"
                             className="app-btn app-btn-secondary !px-2 !py-1 text-xs text-danger"
-                            onClick={() => revokeInvite(invite.id)}
+                            onClick={() => setRevokeTargetId(invite.id)}
                           >
                             בטל קוד
                           </button>
@@ -213,6 +217,19 @@ export function InviteCodesWorkspace({
           ) : null}
         </div>
       </section>
+      <ConfirmDialog
+        open={revokeTargetId !== null}
+        title="ביטול קוד הזמנה"
+        message="לבטל את קוד ההזמנה? לאחר הביטול אי אפשר להשתמש בו."
+        confirmLabel="בטל קוד"
+        cancelLabel="חזרה"
+        busy={revoking}
+        onCancel={() => setRevokeTargetId(null)}
+        onConfirm={() => {
+          if (!revokeTargetId) return;
+          void revokeInvite(revokeTargetId);
+        }}
+      />
     </main>
   );
 }

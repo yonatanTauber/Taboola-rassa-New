@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useQuickActions } from "@/components/QuickActions";
 
 type InstructorOption = {
   id: string;
@@ -53,6 +54,7 @@ export function GuidanceEditor({
   recentCompletedCount: number;
 }) {
   const router = useRouter();
+  const { showToast } = useQuickActions();
   const [title, setTitle] = useState(initialData.title);
   const [scheduledAt, setScheduledAt] = useState(initialData.scheduledAt);
   const [status, setStatus] = useState<"ACTIVE" | "COMPLETED">(initialData.status);
@@ -198,7 +200,7 @@ export function GuidanceEditor({
         const err = (await res.json()) as { error?: string };
         if (err.error) message = `השמירה נכשלה: ${err.error}`;
       } catch {}
-      window.alert(message);
+      showToast({ message });
       return;
     }
     savedSnapshotRef.current = { contentMarkdown, notesMarkdown };
@@ -224,7 +226,7 @@ export function GuidanceEditor({
     });
     setSavingAttachment(false);
     if (!res.ok) {
-      window.alert("העלאת הקובץ נכשלה. נתמכים רק PDF/DOC/DOCX.");
+      showToast({ message: "העלאת הקובץ נכשלה. נתמכים רק PDF/DOC/DOCX." });
       return;
     }
     const payload = (await res.json()) as { fileName: string; mimeType: string; filePath: string };
@@ -240,7 +242,7 @@ export function GuidanceEditor({
     const res = await fetch(`/api/guidance/${guidanceId}/attachment`, { method: "DELETE" });
     setSavingAttachment(false);
     if (!res.ok) {
-      window.alert("מחיקת הנספח נכשלה");
+      showToast({ message: "מחיקת הנספח נכשלה" });
       return;
     }
     setAttachmentFileName(null);
@@ -263,7 +265,7 @@ export function GuidanceEditor({
     });
     setCreatingInstructor(false);
     if (!res.ok) {
-      window.alert("יצירת מדריך נכשלה");
+      showToast({ message: "יצירת מדריך נכשלה" });
       return;
     }
     const payload = (await res.json()) as {
@@ -282,7 +284,7 @@ export function GuidanceEditor({
     const res = await fetch(`/api/guidance/${guidanceId}`, { method: "DELETE" });
     setDeleting(false);
     if (!res.ok) {
-      window.alert("מחיקת הדרכה נכשלה");
+      showToast({ message: "מחיקת הדרכה נכשלה" });
       return;
     }
     router.push("/guidance");

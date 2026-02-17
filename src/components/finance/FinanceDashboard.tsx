@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useQuickActions } from "@/components/QuickActions";
 
 type ReceiptRow = {
   id: string;
@@ -22,6 +23,7 @@ type ExpenseRow = {
 };
 
 export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[]; expenses: ExpenseRow[] }) {
+  const { showToast } = useQuickActions();
   const [monthFilter, setMonthFilter] = useState("CURRENT");
   const [patientFilter, setPatientFilter] = useState("ALL");
   const [viewMode, setViewMode] = useState<"PATIENTS" | "CLINIC">("PATIENTS");
@@ -128,8 +130,8 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
             </Link>
             <button
               type="button"
-              onClick={() => alert("טופס הוצאות יתווסף בשלב הבא")}
-              className="rounded-lg border border-black/20 bg-white px-2.5 py-1.5 text-xs"
+              onClick={() => showToast({ message: "טופס הוצאות יתווסף בשלב הבא" })}
+              className="app-btn app-btn-secondary !px-2.5 !py-1.5 text-xs"
             >
               הוצאה חדשה
             </button>
@@ -174,10 +176,10 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
             </select>
             <button
               type="button"
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              className={`app-btn !px-3 !py-1.5 text-xs ${
                 viewMode === "CLINIC"
-                  ? "border-accent/30 bg-accent-soft text-accent"
-                  : "border-black/20 bg-white"
+                  ? "app-btn-primary"
+                  : "app-btn-secondary"
               }`}
               onClick={() => {
                 const next = viewMode === "CLINIC" ? "PATIENTS" : "CLINIC";

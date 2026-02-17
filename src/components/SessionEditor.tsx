@@ -26,8 +26,9 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const [deleting, setDeleting] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [undocumentedConfirmOpen, setUndocumentedConfirmOpen] = useState(false);
 
-  async function save() {
+  async function save(allowUndocumented = false) {
     const scheduled = new Date(`${datePart}T${hourPart}:${minutePart}`);
     const isPastSession = scheduled.getTime() <= Date.now();
     const hasNote = form.note.trim().length > 0;
@@ -37,9 +38,8 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       if (hasNote) {
         nextStatus = "COMPLETED";
       } else {
-        const closeWithoutDoc = window.confirm("אין תוכן פגישה. לסגור עכשיו ולתעד אחר כך?");
-        if (!closeWithoutDoc) {
-          showToast({ message: "אי אפשר לסגור פגישה עבר ללא תוכן." });
+        if (!allowUndocumented) {
+          setUndocumentedConfirmOpen(true);
           return;
         }
         nextStatus = "UNDOCUMENTED";
@@ -184,7 +184,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => router.back()} className="app-btn app-btn-secondary">ביטול</button>
-          <button onClick={save} className="app-btn app-btn-primary">עדכן</button>
+          <button onClick={() => void save()} className="app-btn app-btn-primary">עדכן</button>
         </div>
       </div>
 
@@ -206,6 +206,19 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         onCancel={() => setCancelOpen(false)}
         onConfirm={cancelSession}
         busy={canceling}
+      />
+      <ConfirmDialog
+        open={undocumentedConfirmOpen}
+        title="אין תוכן פגישה"
+        message="אין תוכן פגישה. לסגור עכשיו ולתעד אחר כך?"
+        confirmLabel="סגור ללא תיעוד"
+        cancelLabel="חזרה לעריכה"
+        danger={false}
+        onCancel={() => setUndocumentedConfirmOpen(false)}
+        onConfirm={() => {
+          setUndocumentedConfirmOpen(false);
+          void save(true);
+        }}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
+import { FixedSessionPicker } from "@/components/patients/FixedSessionPicker";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 
@@ -198,51 +199,21 @@ export default async function NewPatientPage({
               <div className="text-xs text-muted">תאריך לידה</div>
               <input name="dateOfBirth" type="date" lang="he-IL" className="app-field" />
             </label>
-            <label className="space-y-1">
-              <div className="text-xs text-muted">תאריך התחלת טיפול</div>
-              <input
-                name="treatmentStartDate"
-                type="date"
-                lang="he-IL"
-                defaultValue={defaultTreatmentStartDate}
-                className="app-field"
-              />
-            </label>
+            <div className="space-y-2 md:col-span-2 md:grid md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-start md:gap-2">
+              <label className="space-y-1">
+                <div className="text-xs text-muted">תאריך התחלת טיפול</div>
+                <input
+                  name="treatmentStartDate"
+                  type="date"
+                  lang="he-IL"
+                  defaultValue={defaultTreatmentStartDate}
+                  className="app-field"
+                />
+              </label>
 
-            <div className="space-y-2 rounded-xl border border-black/12 bg-black/[0.02] p-3 md:col-span-2">
-              <div className="text-xs text-muted">יום ושעה קבועים (אופציונלי)</div>
-              <div className="grid gap-2 md:grid-cols-[1fr_auto_auto] md:items-end">
-                <select name="fixedSessionDay" className="app-select">
-                  <option value="">ללא יום קבוע</option>
-                  <option value="1">יום ראשון</option>
-                  <option value="2">יום שני</option>
-                  <option value="3">יום שלישי</option>
-                  <option value="4">יום רביעי</option>
-                  <option value="5">יום חמישי</option>
-                  <option value="6">יום שישי</option>
-                  <option value="0">שבת</option>
-                </select>
-                <div className="flex items-end gap-2">
-                  <label className="sr-only">דקות קבועות</label>
-                  <select name="fixedSessionMinute" className="app-select app-time-select">
-                    <option value="">דקות</option>
-                    {MINUTES.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="pb-2 text-sm text-muted">:</span>
-                  <label className="sr-only">שעה קבועה</label>
-                  <select name="fixedSessionHour" className="app-select app-time-select">
-                    <option value="">שעה</option>
-                    {HOURS.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted">יום ושעה קבועים (אופציונלי)</div>
+                <FixedSessionPicker />
               </div>
             </div>
             <input

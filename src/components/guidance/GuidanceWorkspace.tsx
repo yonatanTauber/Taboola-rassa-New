@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuickActions } from "@/components/QuickActions";
 
 type GuidanceRow = {
   id: string;
@@ -31,6 +32,7 @@ export function GuidanceWorkspace({
   instructors: InstructorOption[];
 }) {
   const router = useRouter();
+  const { showToast } = useQuickActions();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [patientFilter, setPatientFilter] = useState("ALL");
@@ -84,7 +86,7 @@ export function GuidanceWorkspace({
     });
     setCreating(false);
     if (!res.ok) {
-      window.alert("יצירת הדרכה נכשלה");
+      showToast({ message: "יצירת הדרכה נכשלה" });
       return;
     }
     const payload = (await res.json()) as { guidanceId: string };

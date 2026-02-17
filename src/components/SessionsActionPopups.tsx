@@ -72,14 +72,14 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
         <button
           type="button"
           onClick={() => setOpen("session")}
-          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-medium transition hover:bg-accent-soft"
+          className="app-btn app-btn-secondary w-full !py-2 text-sm"
         >
           פגישה חדש
         </button>
         <button
           type="button"
           onClick={() => setOpen("task")}
-          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-medium transition hover:bg-accent-soft"
+          className="app-btn app-btn-secondary w-full !py-2 text-sm"
         >
           משימה חדשה
         </button>
@@ -87,7 +87,7 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
 
       <ActionModal open={open === "session"} onClose={() => setOpen(null)} title="פגישה חדש">
         <form onSubmit={submitSession} className="space-y-2 text-sm">
-          <select required name="patientId" className="w-full rounded-lg border border-black/10 px-3 py-2">
+          <select required name="patientId" className="app-select">
             <option value="">בחר מטופל</option>
             {patients.map((p) => (
               <option key={p.id} value={p.id}>
@@ -95,10 +95,10 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
               </option>
             ))}
           </select>
-          <input required type="datetime-local" name="scheduledAt" className="w-full rounded-lg border border-black/10 px-3 py-2" />
-          <input type="number" min="0" name="feeNis" placeholder="מחיר (₪)" className="w-full rounded-lg border border-black/10 px-3 py-2" />
-          <input name="location" placeholder="מיקום (קליניקה / אונליין)" className="w-full rounded-lg border border-black/10 px-3 py-2" />
-          <button className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 font-medium transition hover:bg-accent-soft">
+          <input required type="datetime-local" name="scheduledAt" className="app-field" />
+          <input type="number" min="0" name="feeNis" placeholder="מחיר (₪)" className="app-field" />
+          <input name="location" placeholder="מיקום (קליניקה / אונליין)" className="app-field" />
+          <button className="app-btn app-btn-primary w-full !py-2">
             שמירת פגישה
           </button>
         </form>
@@ -106,9 +106,9 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
 
       <ActionModal open={open === "task"} onClose={() => setOpen(null)} title="משימה חדשה">
         <form onSubmit={submitTask} className="space-y-2 text-sm">
-          <input required name="title" placeholder="תיאור משימה" className="w-full rounded-lg border border-black/10 px-3 py-2" />
-          <input type="date" name="dueAt" className="w-full rounded-lg border border-black/10 px-3 py-2" />
-          <select name="patientId" className="w-full rounded-lg border border-black/10 px-3 py-2">
+          <input required name="title" placeholder="תיאור משימה" className="app-field" />
+          <input type="date" name="dueAt" className="app-field" />
+          <select name="patientId" className="app-select">
             <option value="">משימה כללית לקליניקה</option>
             {patients.map((p) => (
               <option key={p.id} value={p.id}>
@@ -116,7 +116,7 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
               </option>
             ))}
           </select>
-          <button className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 font-medium transition hover:bg-accent-soft">
+          <button className="app-btn app-btn-primary w-full !py-2">
             שמירת משימה
           </button>
         </form>
@@ -155,7 +155,7 @@ function ActionModal({
         <button
           type="button"
           onClick={() => setFullscreen((v) => !v)}
-          className="absolute left-3 top-3 rounded-md border border-black/10 px-2 py-1 text-xs hover:bg-accent-soft"
+          className="app-btn app-btn-secondary absolute left-3 top-3 !px-2 !py-1 text-xs"
           aria-label="הגדל למסך מלא"
         >
           {fullscreen ? "הקטן" : "הגדל"}
@@ -163,7 +163,7 @@ function ActionModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 rounded-md border border-black/10 px-2 py-1 text-xs hover:bg-accent-soft"
+          className="app-btn app-btn-secondary absolute right-3 top-3 !px-2 !py-1 text-xs"
           aria-label="סגור"
         >
           סגור

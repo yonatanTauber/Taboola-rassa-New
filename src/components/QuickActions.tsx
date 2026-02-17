@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import {
   createContext,
@@ -52,6 +53,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const [toast, setToast] = useState<(ToastInput & { id: number }) | null>(null);
   const [menuAnimatingOut, setMenuAnimatingOut] = useState(false);
+  const [dirtyCloseOpen, setDirtyCloseOpen] = useState(false);
   const closeMenuTimer = useRef<number | null>(null);
 
   const [sessionForm, setSessionForm] = useState(() => defaultSessionForm());
@@ -175,8 +177,8 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
 
   function attemptCloseAction() {
     if (isDirty) {
-      const ok = window.confirm("יש שינויים שלא נשמרו. לצאת בלי שמירה?");
-      if (!ok) return;
+      setDirtyCloseOpen(true);
+      return;
     }
     setIsDirty(false);
     setOpenAction(null);
@@ -628,6 +630,20 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
           </div>
         </form>
       </ActionModal>
+
+      <ConfirmDialog
+        open={dirtyCloseOpen}
+        title="לסגור בלי לשמור?"
+        message="יש שינויים שלא נשמרו. האם לצאת בלי שמירה?"
+        confirmLabel="צא בלי שמירה"
+        cancelLabel="המשך עריכה"
+        onCancel={() => setDirtyCloseOpen(false)}
+        onConfirm={() => {
+          setDirtyCloseOpen(false);
+          setIsDirty(false);
+          setOpenAction(null);
+        }}
+      />
 
       {toast ? (
         <div
