@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useQuickActions } from "@/components/QuickActions";
 
 export function PatientArchiveMenu({
@@ -19,6 +20,8 @@ export function PatientArchiveMenu({
   const router = useRouter();
   const { showToast } = useQuickActions();
   const [open, setOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   return (
     <div className="relative">
@@ -53,22 +56,35 @@ export function PatientArchiveMenu({
             className="mt-1 w-full rounded-md px-2 py-1 text-right text-sm text-danger hover:bg-danger/10"
             onClick={async () => {
               setOpen(false);
-              const ok = window.confirm("להעביר מטופל לארכיון?");
-              if (!ok) return;
-              const res = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
-              if (!res.ok) {
-                showToast({ message: "העברה לארכיון נכשלה" });
-                return;
-              }
-              showToast({ message: "המטופל הועבר לארכיון" });
-              router.push("/patients");
-              router.refresh();
+              setArchiveOpen(true);
             }}
           >
             העברה לארכיון
           </button>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={archiveOpen}
+        title="להעביר מטופל לארכיון?"
+        message="ניתן יהיה לראות את המטופל בדף הארכיון."
+        confirmLabel="העבר לארכיון"
+        cancelLabel="ביטול"
+        busy={archiving}
+        onCancel={() => setArchiveOpen(false)}
+        onConfirm={async () => {
+          setArchiving(true);
+          const res = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
+          setArchiving(false);
+          if (!res.ok) {
+            showToast({ message: "העברה לארכיון נכשלה" });
+            return;
+          }
+          showToast({ message: "המטופל הועבר לארכיון" });
+          setArchiveOpen(false);
+          router.push("/patients");
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

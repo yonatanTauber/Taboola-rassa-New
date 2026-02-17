@@ -1,24 +1,10 @@
-import { InquiryStatus } from "@prisma/client";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { InquiryStatusField } from "@/components/inquiries/InquiryStatusField";
 import { requireCurrentUserId } from "@/lib/auth-server";
+import { convertInquiryToPatientById } from "@/lib/inquiries";
 import { prisma } from "@/lib/prisma";
-
-async function generateInternalCode() {
-  const year = new Date().getFullYear();
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const suffix = Math.floor(Math.random() * 1_000_000)
-      .toString()
-      .padStart(6, "0");
-    const candidate = `PT-${year}-${suffix}`;
-    const exists = await prisma.patient.findUnique({
-      where: { internalCode: candidate },
-      select: { id: true },
-    });
-    if (!exists) return candidate;
-  }
-  return `PT-${year}-${Date.now()}`;
-}
 
 async function createInquiry(formData: FormData) {
   "use server";
@@ -51,70 +37,17 @@ async function createInquiry(formData: FormData) {
   revalidatePath("/inquiries");
 }
 
-async function updateInquiryStatus(formData: FormData) {
-  "use server";
-  const userId = await requireCurrentUserId();
-  if (!userId) return;
-  const inquiryId = String(formData.get("inquiryId") ?? "");
-  const status = String(formData.get("status") ?? "");
-  if (!inquiryId) return;
-  if (
-    status !== "NEW" &&
-    status !== "DISCOVERY_CALL" &&
-    status !== "WAITLIST" &&
-    status !== "CONVERTED" &&
-    status !== "CLOSED"
-  ) {
-    return;
-  }
-  const ownInquiry = await prisma.inquiry.findFirst({ where: { id: inquiryId, ownerUserId: userId }, select: { id: true } });
-  if (!ownInquiry) return;
-  await prisma.inquiry.update({ where: { id: inquiryId }, data: { status: status as InquiryStatus } });
-  revalidatePath("/inquiries");
-}
-
 async function convertInquiryToPatient(formData: FormData) {
   "use server";
   const userId = await requireCurrentUserId();
   if (!userId) return;
   const inquiryId = String(formData.get("inquiryId") ?? "");
   if (!inquiryId) return;
-
-  const inquiry = await prisma.inquiry.findFirst({ where: { id: inquiryId, ownerUserId: userId } });
-  if (!inquiry) return;
-  if (inquiry.patientId) {
-    await prisma.inquiry.update({ where: { id: inquiryId }, data: { status: "CONVERTED" } });
-    revalidatePath("/inquiries");
-    return;
-  }
-
-  const patient = await prisma.patient.create({
-    data: {
-      ownerUserId: userId,
-      internalCode: await generateInternalCode(),
-      firstName: inquiry.firstName,
-      lastName: inquiry.lastName,
-      gender: inquiry.gender ?? "OTHER",
-      phone: inquiry.phone,
-      treatmentStartDate: new Date(),
-      researchAlias: `P-${Math.floor(Math.random() * 1_000_000)
-        .toString()
-        .padStart(6, "0")}`,
-      intakes:
-        inquiry.referralSource || inquiry.referralDetails || inquiry.notes
-          ? {
-              create: {
-                referralReason: inquiry.referralSource || null,
-                freeText: [inquiry.referralDetails, inquiry.notes].filter(Boolean).join("\n\n") || null,
-              },
-            }
-          : undefined,
-    },
-  });
-
-  await prisma.inquiry.update({ where: { id: inquiryId }, data: { patientId: patient.id, status: "CONVERTED" } });
+  const converted = await convertInquiryToPatientById({ inquiryId, userId });
+  if (!converted?.patientId) return;
   revalidatePath("/inquiries");
   revalidatePath("/patients");
+  redirect(`/patients/${converted.patientId}`);
 }
 
 export default async function InquiriesPage() {
@@ -174,17 +107,7 @@ export default async function InquiriesPage() {
                   <td className="p-2">{inquiry.phone}</td>
                   <td className="p-2">{inquiry.referralSource ?? "—"}</td>
                   <td className="p-2">
-                    <form action={updateInquiryStatus}>
-                      <input type="hidden" name="inquiryId" value={inquiry.id} />
-                      <select name="status" defaultValue={inquiry.status} className="app-select">
-                        <option value="NEW">חדשה</option>
-                        <option value="DISCOVERY_CALL">שיחת היכרות</option>
-                        <option value="WAITLIST">המתנה</option>
-                        <option value="CONVERTED">הפכה למטופל</option>
-                        <option value="CLOSED">נסגרה</option>
-                      </select>
-                      <button className="mt-2 app-btn app-btn-secondary">שמור</button>
-                    </form>
+                    <InquiryStatusField inquiryId={inquiry.id} initialStatus={inquiry.status} />
                   </td>
                   <td className="p-2">
                     {inquiry.patient ? (

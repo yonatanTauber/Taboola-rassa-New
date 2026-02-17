@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useQuickActions } from "@/components/QuickActions";
 
 type FormState = {
@@ -38,6 +39,8 @@ export function PatientProfileEditor({
   const { showToast } = useQuickActions();
   const [editing, setEditing] = useState(startEditing);
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(collapsible ? initiallyCollapsed && !startEditing : false);
   const [form, setForm] = useState<FormState>(initial);
 
@@ -66,14 +69,15 @@ export function PatientProfileEditor({
   }
 
   async function archivePatient() {
-    const ok = window.confirm("להעביר את המטופל לארכיון?");
-    if (!ok) return;
+    setArchiving(true);
     const res = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
+    setArchiving(false);
     if (!res.ok) {
       showToast({ message: "העברה לארכיון נכשלה." });
       return;
     }
     showToast({ message: "המטופל הועבר לארכיון" });
+    setArchiveOpen(false);
     router.push("/patients");
     router.refresh();
   }
@@ -117,7 +121,7 @@ export function PatientProfileEditor({
           {showArchive ? (
             <button
               type="button"
-              onClick={archivePatient}
+              onClick={() => setArchiveOpen(true)}
               className="app-btn app-btn-secondary text-muted hover:bg-black/[0.03]"
             >
               ארכיון
@@ -230,6 +234,19 @@ export function PatientProfileEditor({
         ) : null}
       </div>
       ) : null}
+
+      <ConfirmDialog
+        open={archiveOpen}
+        title="להעביר מטופל לארכיון?"
+        message="ניתן לצפות בו אחר כך דרך דף מטופלי הארכיון."
+        confirmLabel="העבר לארכיון"
+        cancelLabel="ביטול"
+        busy={archiving}
+        onCancel={() => setArchiveOpen(false)}
+        onConfirm={() => {
+          void archivePatient();
+        }}
+      />
     </section>
   );
 }

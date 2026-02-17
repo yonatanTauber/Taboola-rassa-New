@@ -17,9 +17,10 @@ type Row = {
   nextSessionAt: string | null;
   openTasksCount: number;
   sessionsCount: number;
+  archivedAt: string | null;
 };
 
-type ColumnKey = "name" | "phone" | "gender" | "age" | "lastSession" | "nextSession" | "tasks" | "sessions";
+type ColumnKey = "name" | "phone" | "gender" | "age" | "lastSession" | "nextSession" | "tasks" | "sessions" | "archivedAt";
 type SortDirection = "ASC" | "DESC";
 type GenderFilterKey = "MALE" | "FEMALE" | "OTHER";
 type AgeGroupFilterKey = Row["ageGroup"];
@@ -28,7 +29,7 @@ type FilterCheckboxItem =
   | { group: "gender"; key: GenderFilterKey; label: string }
   | { group: "ageGroup"; key: AgeGroupFilterKey; label: string };
 
-const TABLE_COLUMNS: Array<{ key: ColumnKey; label: string }> = [
+const ACTIVE_COLUMNS: Array<{ key: ColumnKey; label: string }> = [
   { key: "name", label: "שם" },
   { key: "phone", label: "טלפון" },
   { key: "gender", label: "מגדר" },
@@ -37,6 +38,11 @@ const TABLE_COLUMNS: Array<{ key: ColumnKey; label: string }> = [
   { key: "nextSession", label: "פגישה הבאה" },
   { key: "tasks", label: "משימות פתוחות" },
   { key: "sessions", label: "מספר פגישות" },
+];
+
+const ARCHIVED_COLUMNS: Array<{ key: ColumnKey; label: string }> = [
+  ...ACTIVE_COLUMNS,
+  { key: "archivedAt", label: "תאריך ארכוב" },
 ];
 
 const FILTER_CHECKBOX_ITEMS: FilterCheckboxItem[] = [
@@ -64,13 +70,14 @@ const DEFAULT_AGE_GROUP_FILTERS: Record<AgeGroupFilterKey, boolean> = {
   UNKNOWN: true,
 };
 
-export function PatientsTable({ rows }: { rows: Row[] }) {
+export function PatientsTable({ rows, archivedMode = false }: { rows: Row[]; archivedMode?: boolean }) {
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [genderFilters, setGenderFilters] = useState<Record<GenderFilterKey, boolean>>(DEFAULT_GENDER_FILTERS);
   const [ageGroupFilters, setAgeGroupFilters] = useState<Record<AgeGroupFilterKey, boolean>>(DEFAULT_AGE_GROUP_FILTERS);
   const [sortKey, setSortKey] = useState<ColumnKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("ASC");
+  const columns = archivedMode ? ARCHIVED_COLUMNS : ACTIVE_COLUMNS;
 
   const filtered = useMemo(() => {
     const searchText = q.trim().toLowerCase();
@@ -207,21 +214,29 @@ export function PatientsTable({ rows }: { rows: Row[] }) {
         <table className="w-full min-w-[920px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-black/10 text-right text-xs text-muted">
-              {TABLE_COLUMNS.map((column) => renderHeader(column.key, column.label))}
+              {columns.map((column) => renderHeader(column.key, column.label))}
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id} className="border-b border-black/5 hover:bg-black/[0.02]">
                 <td className="max-w-48 p-2">
-                  <Link
-                    href={`/patients/${r.id}`}
-                    className="inline-flex max-w-full items-center rounded-lg bg-accent-soft px-2.5 py-1 text-base font-semibold text-ink transition hover:bg-accent-soft/70"
-                  >
-                    <span className="truncate">
-                      {r.firstName} {r.lastName ? `${r.lastName.charAt(0)}.` : ""}
+                  {archivedMode ? (
+                    <span className="inline-flex max-w-full items-center rounded-lg bg-black/[0.04] px-2.5 py-1 text-base font-semibold text-ink">
+                      <span className="truncate">
+                        {r.firstName} {r.lastName ? `${r.lastName.charAt(0)}.` : ""}
+                      </span>
                     </span>
-                  </Link>
+                  ) : (
+                    <Link
+                      href={`/patients/${r.id}`}
+                      className="inline-flex max-w-full items-center rounded-lg bg-accent-soft px-2.5 py-1 text-base font-semibold text-ink transition hover:bg-accent-soft/70"
+                    >
+                      <span className="truncate">
+                        {r.firstName} {r.lastName ? `${r.lastName.charAt(0)}.` : ""}
+                      </span>
+                    </Link>
+                  )}
                 </td>
                 <td className="max-w-36 p-2"><span className="block truncate">{r.phone}</span></td>
                 <td className="whitespace-nowrap p-2">{genderLabel(r.gender)}</td>
@@ -230,11 +245,12 @@ export function PatientsTable({ rows }: { rows: Row[] }) {
                 <td className="whitespace-nowrap p-2">{formatDate(r.nextSessionAt)}</td>
                 <td className="whitespace-nowrap p-2">{r.openTasksCount}</td>
                 <td className="p-2">{r.sessionsCount}</td>
+                {archivedMode ? <td className="whitespace-nowrap p-2">{formatDate(r.archivedAt)}</td> : null}
               </tr>
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={TABLE_COLUMNS.length} className="p-4 text-center text-sm text-muted">
+                <td colSpan={columns.length} className="p-4 text-center text-sm text-muted">
                   אין מטופלים שתואמים לפילטרים.
                 </td>
               </tr>
@@ -266,6 +282,7 @@ function compareRowsByKey(a: Row, b: Row, key: ColumnKey) {
   if (key === "nextSession") return compareDateAsc(a.nextSessionAt, b.nextSessionAt);
   if (key === "tasks") return compareNullableNumber(a.openTasksCount, b.openTasksCount);
   if (key === "sessions") return compareNullableNumber(a.sessionsCount, b.sessionsCount);
+  if (key === "archivedAt") return compareDateAsc(a.archivedAt, b.archivedAt);
   return 0;
 }
 

@@ -11,26 +11,34 @@ export default async function PatientsPage({
 }) {
   const params = (await searchParams) ?? {};
   const saved = typeof params.saved === "string" ? params.saved : "";
+  const view = typeof params.view === "string" ? params.view : "active";
+  const archivedMode = view === "archived";
   const userId = await requireCurrentUserId();
   if (!userId) return null;
 
-  const patients = await prisma.patient.findMany({
-    where: { archivedAt: null, ownerUserId: userId },
-    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-    include: {
-      sessions: {
-        select: {
-          id: true,
-          scheduledAt: true,
-          status: true,
-          feeNis: true,
+  const [activeCount, archivedCount, patients] = await Promise.all([
+    prisma.patient.count({ where: { archivedAt: null, ownerUserId: userId } }),
+    prisma.patient.count({ where: { archivedAt: { not: null }, ownerUserId: userId } }),
+    prisma.patient.findMany({
+      where: archivedMode
+        ? { archivedAt: { not: null }, ownerUserId: userId }
+        : { archivedAt: null, ownerUserId: userId },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      include: {
+        sessions: {
+          select: {
+            id: true,
+            scheduledAt: true,
+            status: true,
+            feeNis: true,
+          },
+        },
+        tasks: {
+          where: { status: "OPEN" },
         },
       },
-      tasks: {
-        where: { status: "OPEN" },
-      },
-    },
-  });
+    }),
+  ]);
 
   const total = patients.length;
   const needsContact = patients.filter((p) => p.tasks.length > 0).length;
@@ -42,10 +50,26 @@ export default async function PatientsPage({
   return (
     <main className="grid gap-3 lg:grid-cols-[1.5fr_1fr]">
       <section className="space-y-4">
-        {saved ? <Notice text="מטופל חדש נשמר בהצלחה." /> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/patients"
+            className={`app-btn ${!archivedMode ? "app-btn-primary" : "app-btn-secondary"} !text-sm`}
+          >
+            מטופלים פעילים ({activeCount})
+          </Link>
+          <Link
+            href="/patients?view=archived"
+            className={`app-btn ${archivedMode ? "app-btn-primary" : "app-btn-secondary"} !text-sm`}
+          >
+            מטופלי ארכיון ({archivedCount})
+          </Link>
+        </div>
+
+        {!archivedMode && saved ? <Notice text="מטופל חדש נשמר בהצלחה." /> : null}
+        {archivedMode ? <Notice text="תצוגת ארכיון מטופלים פעילה." /> : null}
 
         <div className="grid gap-3 md:grid-cols-3">
-          <StatCard label="סה״כ מטופלים" value={String(total)} />
+          <StatCard label={archivedMode ? "סה״כ בארכיון" : "סה״כ מטופלים"} value={String(total)} />
           <StatCard label="מטופלים למעקב" value={String(needsContact)} />
           <StatCard label="מטופלים פעילים" value={String(activeThisWeek)} />
         </div>
@@ -65,7 +89,9 @@ export default async function PatientsPage({
             lastSessionAt: resolveLastSessionAt(p.sessions, now),
             nextSessionAt: resolveNextSessionAt(p.sessions, now),
             openTasksCount: p.tasks.length,
+            archivedAt: p.archivedAt ? p.archivedAt.toISOString() : null,
           }))}
+          archivedMode={archivedMode}
         />
       </section>
 
