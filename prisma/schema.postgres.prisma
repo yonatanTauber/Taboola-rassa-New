@@ -110,6 +110,27 @@ model User {
   inquiries       Inquiry[]
   tasks           Task[]
   instructors     Instructor[]
+  createdInvites  InviteCode[] @relation("InviteCodeOwner")
+  usedInvites     InviteCode[] @relation("InviteCodeUsedBy")
+}
+
+model InviteCode {
+  id            String    @id @default(cuid())
+  ownerUserId   String?
+  usedByUserId  String?
+  code          String    @unique
+  invitedEmail  String?
+  expiresAt     DateTime?
+  usedAt        DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  ownerUser     User?     @relation("InviteCodeOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  usedByUser    User?     @relation("InviteCodeUsedBy", fields: [usedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, createdAt])
+  @@index([usedByUserId])
+  @@index([invitedEmail])
 }
 
 model Patient {

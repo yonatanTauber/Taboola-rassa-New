@@ -21,7 +21,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             ? "page-tone-finance"
             : pathname.startsWith("/settings")
               ? "page-tone-settings"
-              : "page-tone-dashboard";
+              : pathname.startsWith("/invites")
+                ? "page-tone-settings"
+                : "page-tone-dashboard";
 
   if (authPage) {
     return (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useQuickActions } from "@/components/QuickActions";
 
 type SettingsState = {
@@ -117,6 +118,9 @@ export function SettingsEditor() {
 
       <section className="app-section flex flex-wrap gap-2">
         <button className="app-btn app-btn-primary" onClick={save}>שמור הגדרות</button>
+        <Link href="/invites" className="app-btn app-btn-secondary">
+          ניהול הזמנות משתמשים
+        </Link>
       </section>
     </main>
   );

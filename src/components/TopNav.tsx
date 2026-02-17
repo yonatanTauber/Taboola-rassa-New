@@ -17,6 +17,7 @@ const ITEMS = [
   { href: "/inquiries", label: "פניות" },
   { href: "/receipts", label: "כספים" },
   { href: "/research", label: "מחקר" },
+  { href: "/invites", label: "הזמנות" },
   { href: "/settings", label: "הגדרות" },
 ];
 

@@ -18,7 +18,7 @@ export function requiresInviteCode() {
 
 export function isValidInviteCode(rawCode: string) {
   if (!requiresInviteCode()) return true;
-  const input = rawCode.trim();
+  const input = rawCode.trim().toUpperCase();
   if (!input) return false;
   const configured = getConfiguredInviteCodes();
   return configured.some((candidate) => safeEqual(candidate, input));
@@ -27,7 +27,7 @@ export function isValidInviteCode(rawCode: string) {
 function getConfiguredInviteCodes() {
   return String(process.env.INVITE_CODES ?? "")
     .split(",")
-    .map((item) => item.trim())
+    .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 }
 

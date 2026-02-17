@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/inquiries", label: "פניות", icon: "◎" },
   { href: "/receipts", label: "כספים", icon: "₪" },
   { href: "/research", label: "מחקר", icon: "✦" },
+  { href: "/invites", label: "הזמנות", icon: "✉" },
   { href: "/settings", label: "הגדרות", icon: "⚙" },
 ];
 
