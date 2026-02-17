@@ -1,0 +1,511 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum InquiryStatus {
+  NEW
+  DISCOVERY_CALL
+  WAITLIST
+  CONVERTED
+  CLOSED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELED
+  CANCELED_LATE
+  UNDOCUMENTED
+}
+
+enum PatientState {
+  NO_CHANGE
+  ANXIOUS
+  RISK
+  MANIC
+  PSYCHOTIC
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELED
+}
+
+enum MedicalDocumentKind {
+  EVALUATION
+  TEST_RESULT
+  HOSPITAL_SUMMARY
+  REFERRAL
+  OTHER
+}
+
+enum BillingStatus {
+  OPEN
+  PARTIAL
+  PAID
+  CANCELED
+}
+
+enum ResearchItemKind {
+  ARTICLE
+  BOOK
+  VIDEO
+  LECTURE_NOTE
+  OTHER
+}
+
+enum ResearchTargetType {
+  PATIENT
+  SESSION
+  TASK
+  RECEIPT
+  INQUIRY
+  RESEARCH_DOCUMENT
+  RESEARCH_NOTE
+  OTHER
+}
+
+enum FigureRole {
+  MOTHER
+  FATHER
+  SISTER
+  BROTHER
+  PARTNER
+  FRIEND
+  COLLEAGUE
+  ACQUAINTANCE
+  OTHER
+}
+
+enum GuidanceStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model User {
+  id              String   @id @default(cuid())
+  fullName        String
+  email           String   @unique
+  passwordHash    String
+  profession      String?
+  dateOfBirth     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  patients        Patient[]
+  inquiries       Inquiry[]
+  tasks           Task[]
+  instructors     Instructor[]
+}
+
+model Patient {
+  id                    String            @id @default(cuid())
+  ownerUserId           String?
+  internalCode          String            @unique
+  firstName             String
+  lastName              String
+  avatarKey             String?
+  gender                Gender
+  phone                 String
+  email                 String?
+  dateOfBirth           DateTime?
+  treatmentStartDate    DateTime?
+  fixedSessionDay       Int?
+  fixedSessionTime      String?
+  researchAlias         String?
+  defaultSessionFeeNis  Int?
+  lateCancelCharge      Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  archivedAt            DateTime?
+  inquiries             Inquiry[]
+  intakes               Intake[]
+  sessions              Session[]
+  tasks                 Task[]
+  invoiceRequests       InvoiceRequest[]
+  receipts              Receipt[]
+  medicalDocuments      MedicalDocument[]
+  verbatimNotes         VerbatimNote[]
+  patientNotes          PatientNote[]
+  conceptLinks          PatientConceptLink[]
+  figures               PatientFigure[]
+  guidances             Guidance[]
+  ownerUser             User?             @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, archivedAt])
+}
+
+model Inquiry {
+  id              String        @id @default(cuid())
+  ownerUserId     String?
+  patientId       String?
+  firstName       String
+  lastName        String
+  phone           String
+  gender          Gender?
+  age             Int?
+  referralSource  String?
+  referralDetails String?
+  status          InquiryStatus @default(NEW)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  patient         Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  ownerUser       User?         @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, status])
+}
+
+model Intake {
+  id                     String   @id @default(cuid())
+  patientId              String
+  referralReason         String?
+  goals                  String?
+  previousTherapy        String?
+  currentMedication      String?
+  hospitalizations       String?
+  riskAssessment         String?
+  freeText               String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  patient                Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id                   String        @id @default(cuid())
+  patientId            String
+  scheduledAt          DateTime
+  status               SessionStatus @default(SCHEDULED)
+  location             String?
+  isRecurringTemplate  Boolean       @default(false)
+  feeNis               Int?
+  patientState         PatientState  @default(NO_CHANGE)
+  riskFlag             Boolean       @default(false)
+  riskNote             String?
+  cancellationReason   String?
+  canceledAt           DateTime?
+  rescheduledFromId    String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  patient              Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sessionNote          SessionNote?
+  verbatimNotes        VerbatimNote[]
+  tasks                Task[]
+  paymentAllocations   PaymentAllocation[]
+  medicalDocuments     MedicalDocument[]
+  guidanceLinks        GuidanceSession[]
+  rescheduledFrom      Session?      @relation("SessionReschedule", fields: [rescheduledFromId], references: [id], onDelete: SetNull)
+  rescheduledTo        Session[]     @relation("SessionReschedule")
+
+  @@index([scheduledAt])
+}
+
+
+model SessionNote {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  markdown      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model VerbatimNote {
+  id            String   @id @default(cuid())
+  patientId     String
+  sessionId     String?
+  title         String
+  markdown      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  session       Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  ownerUserId   String?
+  patientId     String?
+  sessionId     String?
+  title         String
+  details       String?
+  dueAt         DateTime?
+  reminderAt    DateTime?
+  status        TaskStatus @default(OPEN)
+  completedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  patient       Patient?   @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  session       Session?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  ownerUser     User?      @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([dueAt])
+  @@index([status])
+  @@index([ownerUserId, status])
+}
+
+
+model InvoiceRequest {
+  id             String        @id @default(cuid())
+  patientId      String
+  requestNumber  String        @unique
+  periodLabel    String?
+  amountNis      Int
+  status         BillingStatus @default(OPEN)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Receipt {
+  id                String              @id @default(cuid())
+  patientId         String
+  receiptNumber     String              @unique
+  amountNis         Int
+  issuedAt          DateTime            @default(now())
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  archivedAt        DateTime?
+  patient           Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  paymentAllocations PaymentAllocation[]
+}
+
+model PaymentAllocation {
+  id            String   @id @default(cuid())
+  receiptId     String
+  sessionId     String
+  amountNis     Int
+  createdAt     DateTime @default(now())
+  receipt       Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([receiptId, sessionId])
+}
+
+model MedicalDocument {
+  id            String              @id @default(cuid())
+  patientId     String
+  sessionId     String?
+  kind          MedicalDocumentKind @default(OTHER)
+  title         String
+  filePath      String
+  mimeType      String?
+  ocrText       String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  patient       Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  session       Session?            @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+}
+
+model Author {
+  id                String                      @id @default(cuid())
+  name              String                      @unique
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  documentAuthors   ResearchDocumentAuthor[]
+}
+
+model Topic {
+  id                String                     @id @default(cuid())
+  name              String                     @unique
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  documentTopics    ResearchDocumentTopic[]
+  noteTopics        ResearchNoteTopic[]
+}
+
+model ResearchDocument {
+  id                String                     @id @default(cuid())
+  kind              ResearchItemKind           @default(ARTICLE)
+  title             String
+  publicationYear   Int?
+  source            String?
+  sourceId          String?
+  externalUrl       String?
+  filePath          String?
+  ocrText           String?
+  workspaceNotes    String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  sourceRef         ResearchSource?            @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  authors           ResearchDocumentAuthor[]
+  topics            ResearchDocumentTopic[]
+  links             ResearchLink[]
+
+  @@index([createdAt])
+}
+
+
+model ResearchSource {
+  id                String             @id @default(cuid())
+  name              String             @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  documents         ResearchDocument[]
+}
+
+model ResearchDocumentAuthor {
+  documentId        String
+  authorId          String
+  document          ResearchDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author            Author           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, authorId])
+}
+
+model ResearchDocumentTopic {
+  documentId        String
+  topicId           String
+  document          ResearchDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  topic             Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, topicId])
+}
+
+model ResearchNote {
+  id                String             @id @default(cuid())
+  title             String
+  markdown          String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  topics            ResearchNoteTopic[]
+  links             ResearchLink[]
+
+  @@index([createdAt])
+}
+
+
+model ResearchNoteTopic {
+  noteId            String
+  topicId           String
+  note              ResearchNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  topic             Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, topicId])
+}
+
+model ResearchLink {
+  id                     String            @id @default(cuid())
+  researchDocumentId     String?
+  researchNoteId         String?
+  targetEntityType       ResearchTargetType
+  targetEntityId         String
+  targetEntityAlias      String?
+  rationale              String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  researchDocument       ResearchDocument? @relation(fields: [researchDocumentId], references: [id], onDelete: Cascade)
+  researchNote           ResearchNote?     @relation(fields: [researchNoteId], references: [id], onDelete: Cascade)
+
+  @@index([targetEntityType, targetEntityId])
+}
+
+
+model PatientNote {
+  id            String   @id @default(cuid())
+  patientId     String
+  title         String
+  content       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model PatientConceptLink {
+  id            String   @id @default(cuid())
+  patientId     String
+  label         String
+  href          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model PatientFigure {
+  id            String    @id @default(cuid())
+  patientId     String
+  name          String
+  role          FigureRole @default(OTHER)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+
+model Expense {
+  id         String   @id @default(cuid())
+  title      String
+  amountNis  Int
+  category   String?
+  occurredAt DateTime @default(now())
+  guidanceId String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  guidance   Guidance? @relation(fields: [guidanceId], references: [id], onDelete: Cascade)
+}
+
+model Instructor {
+  id          String    @id @default(cuid())
+  ownerUserId String
+  fullName    String
+  phone       String?
+  email       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  ownerUser   User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  guidances   Guidance[]
+
+  @@index([ownerUserId, fullName])
+}
+
+model Guidance {
+  id                 String           @id @default(cuid())
+  patientId          String
+  instructorId       String?
+  title              String
+  scheduledAt        DateTime?
+  contentMarkdown    String
+  notesMarkdown      String
+  status             GuidanceStatus   @default(ACTIVE)
+  feeNis             Int?
+  completedAt        DateTime?
+  attachmentFilePath String?
+  attachmentFileName String?
+  attachmentMimeType String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  patient            Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  instructor         Instructor?      @relation(fields: [instructorId], references: [id], onDelete: SetNull)
+  sessions           GuidanceSession[]
+  expense            Expense?
+
+  @@index([patientId, status])
+  @@index([updatedAt])
+  @@index([scheduledAt])
+}
+
+model GuidanceSession {
+  guidanceId String
+  sessionId  String
+  createdAt  DateTime @default(now())
+  guidance   Guidance @relation(fields: [guidanceId], references: [id], onDelete: Cascade)
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@id([guidanceId, sessionId])
+  @@index([sessionId])
+}

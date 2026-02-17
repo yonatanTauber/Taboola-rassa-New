@@ -1,0 +1,268 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4efe7;
+  --panel: #fff9f2;
+  --ink: #2a2a2c;
+  --muted: #5f5a52;
+  --accent: #2f6d5a;
+  --accent-soft: #dfeee6;
+  --warn: #b06b2b;
+  --danger: #a63c3c;
+  --success: #2d7a5c;
+  --tone-rgb: 228 214 197;
+}
+
+@theme inline {
+  --color-app-bg: var(--background);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-heebo);
+  --font-mono: var(--font-plex-mono);
+}
+
+.wordmark-script {
+  font-family: var(--font-caveat), "Bradley Hand", "Segoe Script", cursive;
+  letter-spacing: 0.01em;
+}
+
+html,
+body {
+  color: var(--ink);
+  overflow-x: hidden;
+  width: 100%;
+  background:
+    radial-gradient(circle at 95% 0%, #f1e6d8 0%, transparent 30%),
+    radial-gradient(circle at 0% 100%, #e3f1e8 0%, transparent 28%),
+    linear-gradient(180deg, #f7f1e8 0%, #f3efe7 100%);
+  font-family: var(--font-heebo), sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+.surface-card {
+  border: 1px solid rgb(58 45 33 / 0.22);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(255 255 255 / 0.9)),
+    var(--panel);
+  box-shadow:
+    0 10px 24px rgb(66 52 38 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+::selection {
+  color: #fff;
+  background: var(--accent);
+}
+
+.page-tone-dashboard { --tone-rgb: 229 211 188; }
+.page-tone-patients { --tone-rgb: 206 229 216; }
+.page-tone-sessions { --tone-rgb: 210 221 236; }
+.page-tone-guidance { --tone-rgb: 214 224 236; }
+.page-tone-research { --tone-rgb: 223 210 232; }
+.page-tone-finance { --tone-rgb: 239 223 196; }
+.page-tone-settings { --tone-rgb: 220 220 220; }
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes modal-close {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.96) translateY(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+  scroll-margin-top: 110px;
+}
+
+.app-field,
+.app-select,
+.app-textarea {
+  width: 100%;
+  min-width: 0;
+  border-radius: 0.72rem;
+  border: 1px solid rgb(58 45 33 / 0.26);
+  background: rgb(255 255 255 / 0.98);
+  color: var(--ink);
+  padding: 0.52rem 0.7rem;
+  font-size: 0.9rem;
+  line-height: 1.25rem;
+}
+
+.app-textarea { min-height: 7rem; resize: vertical; }
+
+.app-select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #6b5f55 50%), linear-gradient(135deg, #6b5f55 50%, transparent 50%);
+  background-position: calc(0.9rem) calc(50% - 2px), calc(0.58rem) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-left: 1.72rem;
+}
+
+.app-field:focus-visible,
+.app-select:focus-visible,
+.app-textarea:focus-visible,
+.app-btn:focus-visible,
+.app-icon-btn:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgb(47 109 90 / 0.35);
+  outline-offset: 2px;
+  border-color: rgb(47 109 90 / 0.6);
+}
+
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.72rem;
+  border: 1px solid rgb(58 45 33 / 0.26);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: 150ms ease;
+  touch-action: manipulation;
+}
+
+.app-btn-primary {
+  border-color: rgb(47 109 90 / 0.5);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.app-btn-primary:hover { background: rgb(214 236 226); }
+
+.app-btn-secondary { background: #fff; color: var(--ink); }
+.app-btn-secondary:hover { background: rgb(47 109 90 / 0.08); }
+
+.app-time-select { width: 4.4rem; }
+
+.app-section {
+  border-radius: 1rem;
+  border: 1px solid rgb(58 45 33 / 0.22);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(255 255 255 / 0.9)),
+    radial-gradient(circle at 10% 0%, rgba(var(--tone-rgb), 0.25), transparent 45%);
+  padding: 0.95rem;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid rgb(58 45 33 / 0.3);
+  border-radius: 0.5rem;
+  z-index: 90;
+}
+
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+}
+
+
+a, button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(47, 109, 90, 0.18);
+}
+
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 800px;
+}
+
+.patient-graph-shell {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+.patient-graph-edge {
+  transition: stroke-opacity 180ms ease, stroke-width 180ms ease;
+}
+
+.patient-graph-node {
+  transition: transform 150ms ease;
+}
+
+.patient-graph-link:focus-visible {
+  outline: none;
+}
+
+.patient-graph-link:focus-visible circle {
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.45));
+}
+
+.patient-graph-node-label,
+.patient-graph-node-meta {
+  pointer-events: none;
+  user-select: none;
+}
+
+.filter-switch {
+  position: relative;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid rgb(58 45 33 / 0.28);
+  background: rgb(84 77 67 / 0.35);
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.filter-switch[data-on="true"] {
+  border-color: rgb(47 109 90 / 0.6);
+  background: rgb(47 109 90 / 0.85);
+}
+
+.filter-switch-thumb {
+  position: absolute;
+  top: 0.125rem;
+  left: 1.375rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.22);
+  transition: left 140ms ease;
+}
+
+.filter-switch[data-on="true"] .filter-switch-thumb {
+  left: 0.125rem;
+}
+
+@media (max-width: 767px) {
+  .app-section {
+    border-radius: 1.05rem;
+    padding: 0.82rem;
+  }
+
+  .app-btn {
+    min-height: 2.2rem;
+    border-radius: 0.85rem;
+    font-size: 0.78rem;
+  }
+
+  .app-field,
+  .app-select,
+  .app-textarea {
+    border-radius: 0.85rem;
+    font-size: 16px;
+  }
+}
