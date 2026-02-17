@@ -5,12 +5,16 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:deploy": "npx prisma migrate deploy && npx prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "seed": "node prisma/seed.mjs",
     "test": "npm run test:smoke",
     "test:smoke": "node scripts/smoke-test.mjs",
-    "preflight:deploy": "bash scripts/preflight-deploy.sh"
+    "preflight:deploy": "bash scripts/preflight-deploy.sh",
+    "prisma:validate:sqlite": "PRISMA_SCHEMA_PATH=prisma/schema.prisma npx prisma validate",
+    "prisma:validate:postgres": "PRISMA_SCHEMA_PATH=prisma/schema.postgres.prisma DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tabolla?schema=public npx prisma validate",
+    "prisma:migrate:deploy:postgres": "PRISMA_SCHEMA_PATH=prisma/schema.postgres.prisma npx prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",

@@ -20,6 +20,7 @@ Required:
 - `DATABASE_URL`
 - `AUTH_SECRET`
 - `APP_BASE_URL`
+- `PRISMA_SCHEMA_PATH=prisma/schema.postgres.prisma`
 - `REGISTRATION_MODE`
 - `INVITE_CODES` (if `REGISTRATION_MODE=invite`)
 
@@ -27,6 +28,7 @@ Rules:
 - In production/staging, `DATABASE_URL` must be Postgres (not `file:...`).
 - `AUTH_SECRET` should be long random value (32+ chars).
 - Recommended in production: `REGISTRATION_MODE=invite`.
+- Build command on Vercel should be: `npm run build:deploy`
 
 ## 5) Deploy preflight
 Run locally before each release:

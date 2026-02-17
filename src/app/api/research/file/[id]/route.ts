@@ -32,8 +32,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   try {
     bytes = await readFile(abs);
   } catch {
-    const fallback = new URL(doc.filePath, "http://localhost:3001");
-    return NextResponse.redirect(fallback);
+    return NextResponse.json({ error: "File missing" }, { status: 404 });
   }
   const ext = path.extname(abs).replace(".", "").toLowerCase();
   const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";

@@ -3,9 +3,15 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+const schema = process.env.PRISMA_SCHEMA_PATH?.trim() || "prisma/schema.prisma";
+const migrationsPath =
+  schema === "prisma/schema.postgres.prisma"
+    ? "prisma/migrations-postgres"
+    : "prisma/migrations";
+
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema,
   migrations: {
-    path: "prisma/migrations",
+    path: migrationsPath,
   },
 });

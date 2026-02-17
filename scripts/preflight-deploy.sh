@@ -38,6 +38,17 @@ fi
 pass "DATABASE_URL sanity check passed"
 
 if [ "${NODE_ENV:-development}" == "production" ]; then
+  schema_path="${PRISMA_SCHEMA_PATH:-}"
+  if [ "$schema_path" != "prisma/schema.postgres.prisma" ]; then
+    fail "Production requires PRISMA_SCHEMA_PATH=prisma/schema.postgres.prisma"
+  fi
+  pass "PRISMA_SCHEMA_PATH is postgres schema"
+
+  if [ -z "${APP_BASE_URL:-}" ]; then
+    fail "APP_BASE_URL is missing in production"
+  fi
+  pass "APP_BASE_URL present"
+
   mode="${REGISTRATION_MODE:-invite}"
   if [ "$mode" == "open" ]; then
     echo "[WARN] REGISTRATION_MODE=open in production"
