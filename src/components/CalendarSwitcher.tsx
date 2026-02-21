@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TaskChecklist } from "@/components/TaskChecklist";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, useDraggable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, useDraggable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
 const HEB_DAYS_LONG = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -264,6 +264,9 @@ export function CalendarSwitcher({
     return anchor.getMonth() === today.getMonth() && anchor.getFullYear() === today.getFullYear();
   }, [anchor, mode, today]);
 
+  // Require 5px movement before a drag starts — lets clicks pass through normally
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
   return (
     <section className="app-section">
       {/* Header: title + nav arrows + mode switcher */}
@@ -271,10 +274,10 @@ export function CalendarSwitcher({
         <h2 className="text-lg font-semibold text-ink">יומן</h2>
         {/* Navigation controls – sit beside the mode buttons */}
         <div className="flex items-center gap-1 mr-auto">
-          {/* RTL layout: › = previous (right side), ‹ = next (left side) */}
+          {/* RTL layout: ‹ = previous (go right/back), › = next (go left/forward) */}
           <button
             type="button"
-            onClick={() => navigate(1)}
+            onClick={() => navigate(-1)}
             className="rounded-lg border border-black/12 px-2 py-1 text-sm text-muted hover:bg-accent-soft leading-none"
             aria-label="תקופה הבאה"
           >
@@ -285,7 +288,7 @@ export function CalendarSwitcher({
           </span>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(1)}
             className="rounded-lg border border-black/12 px-2 py-1 text-sm text-muted hover:bg-accent-soft leading-none"
             aria-label="תקופה קודמת"
           >
@@ -307,7 +310,7 @@ export function CalendarSwitcher({
         </div>
       </div>
 
-      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {mode === "week" && (
           <WeekBoard
             anchor={anchor}
@@ -368,58 +371,39 @@ function DroppableDay({ dateKey, children, className }: { dateKey: string; child
 }
 
 function DraggableSession({ session }: { session: CalendarSession }) {
-  const router = useRouter();
   const dragId = `${session.kind}:${session.id}`;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId });
   const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
-  // Track whether the pointer moved significantly (= drag) vs. stayed put (= click)
-  const pointerMoved = useState(false);
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="touch-none"
-      onPointerDown={() => { pointerMoved[1](false); }}
-      onPointerMove={() => { pointerMoved[1](true); }}
-      onPointerUp={() => { if (!pointerMoved[0] && !isDragging) router.push(session.href); }}
-    >
-      <div
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
+      <Link
+        href={session.href}
         className={`block rounded-lg px-1.5 py-1 text-[10px] text-ink hover:brightness-[0.98] cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+        draggable={false}
       >
         <div className="font-mono tabular-nums">{timeRangeLabel(new Date(session.startIso))}</div>
         {session.title && <div className="truncate text-[9px] text-muted">{session.title}</div>}
         <div className="truncate">{session.patient}</div>
-      </div>
+      </Link>
     </div>
   );
 }
 
 function DraggableSessionCompact({ session }: { session: CalendarSession }) {
-  const router = useRouter();
   const dragId = `${session.kind}:${session.id}`;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId });
   const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
-  const pointerMoved = useState(false);
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="touch-none"
-      onPointerDown={() => { pointerMoved[1](false); }}
-      onPointerMove={() => { pointerMoved[1](true); }}
-      onPointerUp={() => { if (!pointerMoved[0] && !isDragging) router.push(session.href); }}
-    >
-      <div
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
+      <Link
+        href={session.href}
         className={`block truncate rounded px-1 py-0.5 text-[10px] text-ink cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+        draggable={false}
       >
         {timeRangeLabel(new Date(session.startIso))} · {session.title ? `${session.title} · ` : ""}{session.patient}
-      </div>
+      </Link>
     </div>
   );
 }
