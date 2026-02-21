@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { TaskChecklist } from "@/components/TaskChecklist";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -33,6 +34,15 @@ type DragItem =
   | { type: "session"; item: CalendarSession }
   | { type: "task"; item: CalendarTask };
 
+type NavProps = {
+  navigate: (delta: number) => void;
+  goToday: () => void;
+  isCurrentPeriod: boolean;
+  periodLabel: string;
+  loading: boolean;
+  mode: ViewMode;
+};
+
 export function CalendarSwitcher({
   sessions: initialSessions,
   tasks: initialTasks,
@@ -40,6 +50,7 @@ export function CalendarSwitcher({
   sessions: CalendarSession[];
   tasks: CalendarTask[];
 }) {
+  const router = useRouter();
   const [mode, setMode] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => {
     const d = new Date();
@@ -156,8 +167,10 @@ export function CalendarSwitcher({
     const overId = over.id.toString();
     if (!overId.startsWith("day:")) return;
 
+    // Fix: parse date as local (not UTC) to avoid off-by-one in Israel (UTC+2)
     const targetDateStr = overId.replace("day:", "");
-    const targetDate = new Date(targetDateStr);
+    const [y, m, day_] = targetDateStr.split("-").map(Number);
+    const targetDate = new Date(y, m - 1, day_); // local midnight
 
     if (activeId.startsWith("session:") || activeId.startsWith("guidance:")) {
       const kind = activeId.startsWith("guidance:") ? "guidance" : "session";
@@ -187,6 +200,8 @@ export function CalendarSwitcher({
         setToast({ message: "שגיאה בעדכון התאריך" });
       } else {
         const snapshot = [...sessions];
+        // Refresh server components (e.g. "פגישות היום" block on dashboard)
+        router.refresh();
         setToast({
           message: "תאריך עודכן",
           undo: () => {
@@ -195,7 +210,7 @@ export function CalendarSwitcher({
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ scheduledAt: originalIso }),
-            });
+            }).then(() => router.refresh());
             setToast(null);
           },
         });
@@ -226,6 +241,7 @@ export function CalendarSwitcher({
         setToast({ message: "שגיאה בעדכון התאריך" });
       } else {
         const snapshot = [...tasks];
+        router.refresh();
         setToast({
           message: "תאריך עודכן",
           undo: () => {
@@ -234,7 +250,7 @@ export function CalendarSwitcher({
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ dueAt: originalIso }),
-            });
+            }).then(() => router.refresh());
             setToast(null);
           },
         });
@@ -242,7 +258,7 @@ export function CalendarSwitcher({
     }
 
     setTimeout(() => setToast(null), 4000);
-  }, [sessions, tasks]);
+  }, [sessions, tasks, router]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -257,45 +273,16 @@ export function CalendarSwitcher({
     return anchor.getMonth() === today.getMonth() && anchor.getFullYear() === today.getFullYear();
   }, [anchor, mode, today]);
 
+  const navProps: NavProps = { navigate, goToday, isCurrentPeriod, periodLabel, loading, mode };
+
   return (
     <section className="app-section">
-      <div className="mb-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink">יומן</h2>
-          <div className="flex gap-1 rounded-xl border border-black/12 p-1 text-[11px]">
-            <ModeButton active={mode === "week"} onClick={() => setMode("week")} label="שבועית" />
-            <ModeButton active={mode === "month"} onClick={() => setMode("month")} label="חודשית" />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="rounded-lg border border-black/12 px-2 py-1 text-xs text-muted hover:bg-accent-soft"
-            aria-label="תקופה קודמת"
-          >
-            ›
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(1)}
-            className="rounded-lg border border-black/12 px-2 py-1 text-xs text-muted hover:bg-accent-soft"
-            aria-label="תקופה הבאה"
-          >
-            ‹
-          </button>
-          <span className="flex-1 text-center text-sm font-medium text-ink">
-            {loading ? <span className="opacity-50">{periodLabel}</span> : periodLabel}
-          </span>
-          {!isCurrentPeriod && (
-            <button
-              type="button"
-              onClick={goToday}
-              className="rounded-lg border border-black/12 px-2.5 py-1 text-xs text-accent hover:bg-accent-soft"
-            >
-              {mode === "week" ? "השבוע" : "החודש"}
-            </button>
-          )}
+      {/* Header: title + mode switcher only */}
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-ink">יומן</h2>
+        <div className="flex gap-1 rounded-xl border border-black/12 p-1 text-[11px]">
+          <ModeButton active={mode === "week"} onClick={() => setMode("week")} label="שבועית" />
+          <ModeButton active={mode === "month"} onClick={() => setMode("month")} label="חודשית" />
         </div>
       </div>
 
@@ -307,6 +294,7 @@ export function CalendarSwitcher({
             tasks={visibleTasks}
             today={today}
             onOpenDayTasks={setTaskPopup}
+            navProps={navProps}
           />
         )}
         {mode === "month" && (
@@ -316,6 +304,7 @@ export function CalendarSwitcher({
             tasks={visibleTasks}
             today={today}
             onOpenDayTasks={setTaskPopup}
+            navProps={navProps}
           />
         )}
         <DragOverlay>
@@ -347,6 +336,44 @@ export function CalendarSwitcher({
         </div>
       )}
     </section>
+  );
+}
+
+/** Navigation bar rendered below the board */
+function NavBar({ navProps }: { navProps: NavProps }) {
+  const { navigate, goToday, isCurrentPeriod, periodLabel, loading, mode } = navProps;
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      {/* RTL: › = go back (right), ‹ = go forward (left) */}
+      <button
+        type="button"
+        onClick={() => navigate(1)}
+        className="rounded-lg border border-black/12 px-2.5 py-1 text-sm text-muted hover:bg-accent-soft"
+        aria-label="תקופה הבאה"
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="rounded-lg border border-black/12 px-2.5 py-1 text-sm text-muted hover:bg-accent-soft"
+        aria-label="תקופה קודמת"
+      >
+        ›
+      </button>
+      <span className="flex-1 text-center text-sm font-medium text-ink">
+        {loading ? <span className="opacity-40">{periodLabel}</span> : periodLabel}
+      </span>
+      {!isCurrentPeriod && (
+        <button
+          type="button"
+          onClick={goToday}
+          className="rounded-lg border border-black/12 px-2.5 py-1 text-xs text-accent hover:bg-accent-soft"
+        >
+          {mode === "week" ? "השבוע" : "החודש"}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -422,12 +449,14 @@ function WeekBoard({
   tasks,
   today,
   onOpenDayTasks,
+  navProps,
 }: {
   anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
   today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
+  navProps: NavProps;
 }) {
   const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }).map((_, idx) => {
@@ -437,53 +466,56 @@ function WeekBoard({
   });
 
   return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
-      {days.map((day) => {
-        const dateKey = toDateKey(day);
-        const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), day));
-        const daySessions = sessions
-          .filter((s) => sameDay(new Date(s.startIso), day))
-          .sort((a, b) => +new Date(a.startIso) - +new Date(b.startIso));
-        const isToday = sameDay(day, today);
+    <>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
+        {days.map((day) => {
+          const dateKey = toDateKey(day);
+          const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), day));
+          const daySessions = sessions
+            .filter((s) => sameDay(new Date(s.startIso), day))
+            .sort((a, b) => +new Date(a.startIso) - +new Date(b.startIso));
+          const isToday = sameDay(day, today);
 
-        return (
-          <DroppableDay
-            key={dateKey}
-            dateKey={dateKey}
-            className={`min-h-72 rounded-xl border p-2 transition-colors ${isToday ? "border-accent bg-accent-soft/20" : "border-black/12"}`}
-          >
-            <div className={`mb-2 text-[11px] font-medium ${isToday ? "text-accent" : "text-muted"}`}>
-              {`יום ${HEB_DAYS_LONG[day.getDay()]} ${day.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}`}
-            </div>
+          return (
+            <DroppableDay
+              key={dateKey}
+              dateKey={dateKey}
+              className={`min-h-72 rounded-xl border p-2 transition-colors ${isToday ? "border-accent bg-accent-soft/20" : "border-black/12"}`}
+            >
+              <div className={`mb-2 text-[11px] font-medium ${isToday ? "text-accent" : "text-muted"}`}>
+                {`יום ${HEB_DAYS_LONG[day.getDay()]} ${day.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}`}
+              </div>
 
-            <div className="mb-2 rounded-lg bg-app-bg p-1.5">
-              <div className="mb-1 text-[10px] font-medium text-muted">משימות</div>
-              {dayTasks.length ? (
-                <div className="space-y-1">
-                  {dayTasks.map((t) => (
-                    <DraggableTask
-                      key={t.id}
-                      task={t}
-                      onOpen={() => onOpenDayTasks({ dateLabel: day.toLocaleDateString("he-IL"), tasks: dayTasks })}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-[10px] text-muted">—</div>
-              )}
-            </div>
+              <div className="mb-2 rounded-lg bg-app-bg p-1.5">
+                <div className="mb-1 text-[10px] font-medium text-muted">משימות</div>
+                {dayTasks.length ? (
+                  <div className="space-y-1">
+                    {dayTasks.map((t) => (
+                      <DraggableTask
+                        key={t.id}
+                        task={t}
+                        onOpen={() => onOpenDayTasks({ dateLabel: day.toLocaleDateString("he-IL"), tasks: dayTasks })}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-muted">—</div>
+                )}
+              </div>
 
-            <div className="space-y-1">
-              {daySessions.length ? (
-                daySessions.map((s) => <DraggableSession key={s.id} session={s} />)
-              ) : (
-                <div className="text-[10px] text-muted">אין פגישות</div>
-              )}
-            </div>
-          </DroppableDay>
-        );
-      })}
-    </div>
+              <div className="space-y-1">
+                {daySessions.length ? (
+                  daySessions.map((s) => <DraggableSession key={s.id} session={s} />)
+                ) : (
+                  <div className="text-[10px] text-muted">אין פגישות</div>
+                )}
+              </div>
+            </DroppableDay>
+          );
+        })}
+      </div>
+      <NavBar navProps={navProps} />
+    </>
   );
 }
 
@@ -493,12 +525,14 @@ function MonthBoard({
   tasks,
   today,
   onOpenDayTasks,
+  navProps,
 }: {
   anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
   today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
+  navProps: NavProps;
 }) {
   const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const firstWeekStart = startOfWeek(monthStart);
@@ -510,52 +544,55 @@ function MonthBoard({
   });
 
   return (
-    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
-      {cells.map((d) => {
-        const dateKey = toDateKey(d);
-        const daySessions = sessions.filter((s) => sameDay(new Date(s.startIso), d));
-        const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), d));
-        const inMonth = d.getMonth() === anchor.getMonth();
-        const isToday = sameDay(d, today);
+    <>
+      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
+        {cells.map((d) => {
+          const dateKey = toDateKey(d);
+          const daySessions = sessions.filter((s) => sameDay(new Date(s.startIso), d));
+          const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), d));
+          const inMonth = d.getMonth() === anchor.getMonth();
+          const isToday = sameDay(d, today);
 
-        const dayLabel = `יום ${HEB_DAYS_LONG[d.getDay()]} ${d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}`;
+          const dayLabel = `יום ${HEB_DAYS_LONG[d.getDay()]} ${d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}`;
 
-        return (
-          <DroppableDay
-            key={dateKey}
-            dateKey={dateKey}
-            className={`min-h-28 rounded-lg border p-2 transition-colors ${
-              isToday
-                ? "border-accent bg-accent-soft/20"
-                : inMonth
-                ? "border-black/12"
-                : "border-black/5 bg-black/[0.015]"
-            }`}
-          >
-            <div className={`mb-1 text-[11px] font-medium ${isToday ? "text-accent" : inMonth ? "text-ink" : "text-muted"}`}>
-              {dayLabel}
-            </div>
-            <div className="space-y-1">
-              {dayTasks.length ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenDayTasks({ dateLabel: d.toLocaleDateString("he-IL"), tasks: dayTasks })}
-                  className="block w-full truncate rounded bg-app-bg px-1 py-0.5 text-[10px] text-ink transition hover:bg-accent-soft"
-                >
-                  {dayTasks.length} משימות
-                </button>
-              ) : null}
-              {daySessions.slice(0, 2).map((s) => (
-                <DraggableSessionCompact key={s.id} session={s} />
-              ))}
-              {daySessions.length > 2 && (
-                <div className="text-[9px] text-muted">+{daySessions.length - 2} נוספות</div>
-              )}
-            </div>
-          </DroppableDay>
-        );
-      })}
-    </div>
+          return (
+            <DroppableDay
+              key={dateKey}
+              dateKey={dateKey}
+              className={`min-h-28 rounded-lg border p-2 transition-colors ${
+                isToday
+                  ? "border-accent bg-accent-soft/20"
+                  : inMonth
+                  ? "border-black/12"
+                  : "border-black/5 bg-black/[0.015]"
+              }`}
+            >
+              <div className={`mb-1 text-[11px] font-medium ${isToday ? "text-accent" : inMonth ? "text-ink" : "text-muted"}`}>
+                {dayLabel}
+              </div>
+              <div className="space-y-1">
+                {dayTasks.length ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDayTasks({ dateLabel: d.toLocaleDateString("he-IL"), tasks: dayTasks })}
+                    className="block w-full truncate rounded bg-app-bg px-1 py-0.5 text-[10px] text-ink transition hover:bg-accent-soft"
+                  >
+                    {dayTasks.length} משימות
+                  </button>
+                ) : null}
+                {daySessions.slice(0, 2).map((s) => (
+                  <DraggableSessionCompact key={s.id} session={s} />
+                ))}
+                {daySessions.length > 2 && (
+                  <div className="text-[9px] text-muted">+{daySessions.length - 2} נוספות</div>
+                )}
+              </div>
+            </DroppableDay>
+          );
+        })}
+      </div>
+      <NavBar navProps={navProps} />
+    </>
   );
 }
 
@@ -596,8 +633,12 @@ function ModeButton({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
+// Fix: use local date parts to avoid UTC off-by-one in Israel (UTC+2)
 function toDateKey(d: Date) {
-  return d.toISOString().split("T")[0];
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function sameDay(a: Date, b: Date) {
