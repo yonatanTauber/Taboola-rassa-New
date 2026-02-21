@@ -7,10 +7,15 @@ export async function getCurrentUser() {
   const token = jar.get(sessionCookieName())?.value;
   const parsed = readSessionToken(token);
   if (!parsed) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: parsed.userId },
-    select: { id: true, fullName: true, email: true, profession: true },
+    select: { id: true, fullName: true, email: true, profession: true, defaultSessionFeeNis: true, passwordChangedAt: true },
   });
+  if (!user) return null;
+  // בטל session אם הסיסמה שונתה אחרי שהוא הונפק
+  if (user.passwordChangedAt && parsed.issuedAt < user.passwordChangedAt.getTime()) return null;
+  const { passwordChangedAt: _, ...userWithoutSensitive } = user;
+  return userWithoutSensitive;
 }
 
 export async function requireCurrentUserId() {

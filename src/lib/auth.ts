@@ -29,9 +29,11 @@ export function verifyPassword(password: string, encoded: string) {
 
 export function signSessionToken(userId: string) {
   const secret = getAuthSecret();
+  const now = Date.now();
   const payload = JSON.stringify({
     uid: userId,
-    exp: Date.now() + SESSION_TTL_SECONDS * 1000,
+    iat: now,
+    exp: now + SESSION_TTL_SECONDS * 1000,
   });
   const payloadB64 = Buffer.from(payload, "utf8").toString("base64url");
   const sig = createHmac("sha256", secret).update(payloadB64).digest("base64url");
@@ -47,7 +49,7 @@ export function readSessionToken(token: string | undefined) {
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { uid?: string; exp?: number };
+  const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { uid?: string; iat?: number; exp?: number };
   if (!payload.uid || !payload.exp || payload.exp < Date.now()) return null;
-  return { userId: payload.uid };
+  return { userId: payload.uid, issuedAt: payload.iat ?? 0 };
 }

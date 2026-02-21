@@ -3,11 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, sessionCookieName, sessionMaxAgeSeconds, signSessionToken } from "@/lib/auth";
 import { getRegistrationMode, isValidInviteCode, requiresInviteCode } from "@/lib/registration";
 import { isExpiredDate, normalizeInviteCode } from "@/lib/invite-codes";
+import { checkRegisterRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
+    const rateLimit = checkRegisterRateLimit(req);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: `יותר מדי ניסיונות הרשמה. נסה שוב בעוד ${rateLimit.retryAfterSeconds} שניות.` },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+      );
+    }
     const body = (await req.json()) as {
       fullName?: string;
       email?: string;
@@ -15,6 +23,7 @@ export async function POST(req: Request) {
       profession?: string;
       dateOfBirth?: string;
       inviteCode?: string;
+      defaultSessionFeeNis?: number | string;
     };
 
     const fullName = String(body.fullName ?? "").trim();
@@ -23,6 +32,10 @@ export async function POST(req: Request) {
     const profession = String(body.profession ?? "").trim();
     const dateOfBirthRaw = String(body.dateOfBirth ?? "").trim();
     const inviteCode = normalizeInviteCode(String(body.inviteCode ?? ""));
+    const defaultSessionFeeRaw = Number(body.defaultSessionFeeNis ?? 0);
+    const defaultSessionFeeNis = Number.isFinite(defaultSessionFeeRaw) && defaultSessionFeeRaw > 0
+      ? Math.trunc(defaultSessionFeeRaw)
+      : null;
 
     const registrationMode = getRegistrationMode();
     if (registrationMode === "closed") {
@@ -71,8 +84,11 @@ export async function POST(req: Request) {
     if (managedInvite?.invitedEmail && managedInvite.invitedEmail !== email) {
       return NextResponse.json({ error: "קוד ההזמנה שייך למייל אחר." }, { status: 403 });
     }
-    if (password.length < 8) {
-      return NextResponse.json({ error: "הסיסמה חייבת להכיל לפחות 8 תווים." }, { status: 400 });
+    if (password.length < 10) {
+      return NextResponse.json({ error: "הסיסמה חייבת להכיל לפחות 10 תווים." }, { status: 400 });
+    }
+    if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return NextResponse.json({ error: "הסיסמה חייבת להכיל לפחות מספר אחד או תו מיוחד." }, { status: 400 });
     }
 
     const exists = await prisma.user.findUnique({ where: { email } });
@@ -88,6 +104,7 @@ export async function POST(req: Request) {
           passwordHash: hashPassword(password),
           profession: profession || null,
           dateOfBirth: dateOfBirthRaw ? new Date(dateOfBirthRaw) : null,
+          defaultSessionFeeNis,
         },
         select: { id: true },
       });

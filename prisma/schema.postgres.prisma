@@ -97,21 +97,31 @@ enum GuidanceStatus {
   COMPLETED
 }
 
+enum PatientLifecycleEventType {
+  INQUIRY_LINKED
+  CONVERTED_TO_PATIENT
+  SET_INACTIVE
+  REACTIVATED
+}
+
 model User {
-  id              String   @id @default(cuid())
-  fullName        String
-  email           String   @unique
-  passwordHash    String
-  profession      String?
-  dateOfBirth     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String    @id @default(cuid())
+  fullName          String
+  email             String    @unique
+  passwordHash      String
+  passwordChangedAt DateTime?
+  profession        String?
+  dateOfBirth       DateTime?
+  defaultSessionFeeNis Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   patients        Patient[]
   inquiries       Inquiry[]
   tasks           Task[]
   instructors     Instructor[]
   createdInvites  InviteCode[] @relation("InviteCodeOwner")
   usedInvites     InviteCode[] @relation("InviteCodeUsedBy")
+  lifecycleEvents PatientLifecycleEvent[] @relation("PatientLifecycleActor")
 }
 
 model InviteCode {
@@ -165,9 +175,26 @@ model Patient {
   conceptLinks          PatientConceptLink[]
   figures               PatientFigure[]
   guidances             Guidance[]
+  lifecycleEvents       PatientLifecycleEvent[]
   ownerUser             User?             @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, archivedAt])
+}
+
+model PatientLifecycleEvent {
+  id          String                    @id @default(cuid())
+  patientId   String
+  eventType   PatientLifecycleEventType
+  occurredAt  DateTime
+  reason      String?
+  metadataJson Json?
+  actorUserId String?
+  createdAt   DateTime                  @default(now())
+  patient     Patient                   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  actorUser   User?                     @relation("PatientLifecycleActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, occurredAt])
+  @@index([actorUserId])
 }
 
 model Inquiry {
@@ -529,4 +556,18 @@ model GuidanceSession {
 
   @@id([guidanceId, sessionId])
   @@index([sessionId])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  action       String
+  resourceId   String?
+  resourceType String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
