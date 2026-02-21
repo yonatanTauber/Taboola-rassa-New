@@ -34,15 +34,6 @@ type DragItem =
   | { type: "session"; item: CalendarSession }
   | { type: "task"; item: CalendarTask };
 
-type NavProps = {
-  navigate: (delta: number) => void;
-  goToday: () => void;
-  isCurrentPeriod: boolean;
-  periodLabel: string;
-  loading: boolean;
-  mode: ViewMode;
-};
-
 export function CalendarSwitcher({
   sessions: initialSessions,
   tasks: initialTasks,
@@ -273,13 +264,43 @@ export function CalendarSwitcher({
     return anchor.getMonth() === today.getMonth() && anchor.getFullYear() === today.getFullYear();
   }, [anchor, mode, today]);
 
-  const navProps: NavProps = { navigate, goToday, isCurrentPeriod, periodLabel, loading, mode };
-
   return (
     <section className="app-section">
-      {/* Header: title + mode switcher only */}
-      <div className="mb-3 flex items-center justify-between">
+      {/* Header: title + nav arrows + mode switcher */}
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">יומן</h2>
+        {/* Navigation controls – sit beside the mode buttons */}
+        <div className="flex items-center gap-1 mr-auto">
+          {/* RTL layout: › = previous (right side), ‹ = next (left side) */}
+          <button
+            type="button"
+            onClick={() => navigate(1)}
+            className="rounded-lg border border-black/12 px-2 py-1 text-sm text-muted hover:bg-accent-soft leading-none"
+            aria-label="תקופה הבאה"
+          >
+            ‹
+          </button>
+          <span className="text-xs font-medium text-ink whitespace-nowrap px-1">
+            {loading ? <span className="opacity-40">{periodLabel}</span> : periodLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="rounded-lg border border-black/12 px-2 py-1 text-sm text-muted hover:bg-accent-soft leading-none"
+            aria-label="תקופה קודמת"
+          >
+            ›
+          </button>
+          {!isCurrentPeriod && (
+            <button
+              type="button"
+              onClick={goToday}
+              className="rounded-lg border border-black/12 px-2 py-1 text-xs text-accent hover:bg-accent-soft"
+            >
+              {mode === "week" ? "השבוע" : "החודש"}
+            </button>
+          )}
+        </div>
         <div className="flex gap-1 rounded-xl border border-black/12 p-1 text-[11px]">
           <ModeButton active={mode === "week"} onClick={() => setMode("week")} label="שבועית" />
           <ModeButton active={mode === "month"} onClick={() => setMode("month")} label="חודשית" />
@@ -294,7 +315,6 @@ export function CalendarSwitcher({
             tasks={visibleTasks}
             today={today}
             onOpenDayTasks={setTaskPopup}
-            navProps={navProps}
           />
         )}
         {mode === "month" && (
@@ -304,7 +324,6 @@ export function CalendarSwitcher({
             tasks={visibleTasks}
             today={today}
             onOpenDayTasks={setTaskPopup}
-            navProps={navProps}
           />
         )}
         <DragOverlay>
@@ -339,44 +358,6 @@ export function CalendarSwitcher({
   );
 }
 
-/** Navigation bar rendered below the board */
-function NavBar({ navProps }: { navProps: NavProps }) {
-  const { navigate, goToday, isCurrentPeriod, periodLabel, loading, mode } = navProps;
-  return (
-    <div className="mt-3 flex items-center gap-2">
-      {/* RTL: › = go back (right), ‹ = go forward (left) */}
-      <button
-        type="button"
-        onClick={() => navigate(1)}
-        className="rounded-lg border border-black/12 px-2.5 py-1 text-sm text-muted hover:bg-accent-soft"
-        aria-label="תקופה הבאה"
-      >
-        ‹
-      </button>
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="rounded-lg border border-black/12 px-2.5 py-1 text-sm text-muted hover:bg-accent-soft"
-        aria-label="תקופה קודמת"
-      >
-        ›
-      </button>
-      <span className="flex-1 text-center text-sm font-medium text-ink">
-        {loading ? <span className="opacity-40">{periodLabel}</span> : periodLabel}
-      </span>
-      {!isCurrentPeriod && (
-        <button
-          type="button"
-          onClick={goToday}
-          className="rounded-lg border border-black/12 px-2.5 py-1 text-xs text-accent hover:bg-accent-soft"
-        >
-          {mode === "week" ? "השבוע" : "החודש"}
-        </button>
-      )}
-    </div>
-  );
-}
-
 function DroppableDay({ dateKey, children, className }: { dateKey: string; children: React.ReactNode; className: string }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${dateKey}` });
   return (
@@ -387,41 +368,58 @@ function DroppableDay({ dateKey, children, className }: { dateKey: string; child
 }
 
 function DraggableSession({ session }: { session: CalendarSession }) {
+  const router = useRouter();
   const dragId = `${session.kind}:${session.id}`;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId });
   const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
+  // Track whether the pointer moved significantly (= drag) vs. stayed put (= click)
+  const pointerMoved = useState(false);
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
-      <Link
-        href={session.href}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="touch-none"
+      onPointerDown={() => { pointerMoved[1](false); }}
+      onPointerMove={() => { pointerMoved[1](true); }}
+      onPointerUp={() => { if (!pointerMoved[0] && !isDragging) router.push(session.href); }}
+    >
+      <div
         className={`block rounded-lg px-1.5 py-1 text-[10px] text-ink hover:brightness-[0.98] cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
-        onClick={(e) => { if (isDragging) e.preventDefault(); }}
-        draggable={false}
       >
         <div className="font-mono tabular-nums">{timeRangeLabel(new Date(session.startIso))}</div>
         {session.title && <div className="truncate text-[9px] text-muted">{session.title}</div>}
         <div className="truncate">{session.patient}</div>
-      </Link>
+      </div>
     </div>
   );
 }
 
 function DraggableSessionCompact({ session }: { session: CalendarSession }) {
+  const router = useRouter();
   const dragId = `${session.kind}:${session.id}`;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId });
   const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
+  const pointerMoved = useState(false);
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
-      <Link
-        href={session.href}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="touch-none"
+      onPointerDown={() => { pointerMoved[1](false); }}
+      onPointerMove={() => { pointerMoved[1](true); }}
+      onPointerUp={() => { if (!pointerMoved[0] && !isDragging) router.push(session.href); }}
+    >
+      <div
         className={`block truncate rounded px-1 py-0.5 text-[10px] text-ink cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
-        onClick={(e) => { if (isDragging) e.preventDefault(); }}
-        draggable={false}
       >
         {timeRangeLabel(new Date(session.startIso))} · {session.title ? `${session.title} · ` : ""}{session.patient}
-      </Link>
+      </div>
     </div>
   );
 }
@@ -449,14 +447,12 @@ function WeekBoard({
   tasks,
   today,
   onOpenDayTasks,
-  navProps,
 }: {
   anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
   today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
-  navProps: NavProps;
 }) {
   const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }).map((_, idx) => {
@@ -514,7 +510,6 @@ function WeekBoard({
           );
         })}
       </div>
-      <NavBar navProps={navProps} />
     </>
   );
 }
@@ -525,14 +520,12 @@ function MonthBoard({
   tasks,
   today,
   onOpenDayTasks,
-  navProps,
 }: {
   anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
   today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
-  navProps: NavProps;
 }) {
   const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const firstWeekStart = startOfWeek(monthStart);
@@ -591,7 +584,6 @@ function MonthBoard({
           );
         })}
       </div>
-      <NavBar navProps={navProps} />
     </>
   );
 }
