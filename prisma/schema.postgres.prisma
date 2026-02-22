@@ -179,6 +179,7 @@ model Patient {
   ownerUser             User?             @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, archivedAt])
+  @@unique([ownerUserId, firstName, lastName])
 }
 
 model PatientLifecycleEvent {

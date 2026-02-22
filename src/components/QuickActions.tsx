@@ -74,18 +74,19 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
   }, [openMenu]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/patients/options", { cache: "no-store", signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data) setPatients((data as { patients: PatientOption[] }).patients);
-      })
-      .catch(() => {});
+    fetch("/api/patients/options", { cache: "no-store", credentials: "include", signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data: { patients: PatientOption[] }) => { setPatients(data.patients); })
+      .catch((err) => { if (err !== 20) console.error("[QuickActions] patients/options:", err); });
     return () => controller.abort();
   }, []);
 
 
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      return;
+    }
     const onPointerDown = (e: PointerEvent) => {
       if (!openMenu) return;
       const target = e.target as HTMLElement | null;

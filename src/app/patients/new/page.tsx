@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { FixedSessionPicker } from "@/components/patients/FixedSessionPicker";
-import { requireCurrentUserId } from "@/lib/auth-server";
+import { getCurrentUser, requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
@@ -79,6 +80,8 @@ async function createPatient(formData: FormData) {
 
   const parsedFixedDay = fixedSessionDay !== "" ? Number(fixedSessionDay) : null;
   const parsedFee = Number.isFinite(defaultSessionFeeNis) && defaultSessionFeeNis > 0 ? defaultSessionFeeNis : null;
+  const currentUser = await prisma.user.findUnique({ where: { id: userId }, select: { defaultSessionFeeNis: true } });
+  const effectiveDefaultFee = parsedFee ?? (currentUser?.defaultSessionFeeNis ?? null);
   const parsedDateOfBirth = dateOfBirth ? parseDateInput(dateOfBirth) : null;
   const parsedTreatmentStartDate = treatmentStartDateRaw
     ? parseDateInput(treatmentStartDateRaw)
@@ -127,7 +130,7 @@ async function createPatient(formData: FormData) {
           .toString()
           .padStart(6, "0")}`,
         avatarKey: AVATAR_KEYS[Math.floor(Math.random() * AVATAR_KEYS.length)],
-        defaultSessionFeeNis: parsedFee,
+        defaultSessionFeeNis: effectiveDefaultFee,
         dateOfBirth: parsedDateOfBirth,
         treatmentStartDate: parsedTreatmentStartDate ?? new Date(),
         fixedSessionDay: parsedFixedDay,
@@ -150,18 +153,28 @@ async function createPatient(formData: FormData) {
     }
   } catch (error) {
     console.error("createPatient failed", error);
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      redirect(`/patients/new?error=duplicate-name&first=${encodeURIComponent(firstName)}&last=${encodeURIComponent(lastName)}`);
+    }
     redirect("/patients/new?error=create-failed");
   }
 
   redirect(`/patients?saved=patient`);
 }
 
-function errorText(errorCode?: string) {
+function errorText(errorCode?: string, firstName?: string, lastName?: string) {
   if (errorCode === "missing-required") return "יש להשלים שם פרטי, שם משפחה וטלפון.";
   if (errorCode === "invalid-birth-date") return "תאריך הלידה שהוזן אינו תקין.";
   if (errorCode === "invalid-treatment-start-date") return "תאריך התחלת הטיפול אינו תקין.";
   if (errorCode === "invalid-fixed-day") return "יום קבוע לפגישה אינו תקין.";
   if (errorCode === "invalid-fixed-time") return "השעה הקבועה לפגישה אינה תקינה.";
+  if (errorCode === "duplicate-name") {
+    const name = [firstName, lastName].filter(Boolean).join(" ");
+    return `מטופל בשם "${name}" כבר קיים במערכת.`;
+  }
   if (errorCode === "create-failed") return "שמירת המטופל נכשלה. נסה שוב.";
   return null;
 }
@@ -169,11 +182,13 @@ function errorText(errorCode?: string) {
 export default async function NewPatientPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; first?: string; last?: string }>;
 }) {
   const query = await searchParams;
-  const error = errorText(query.error);
+  const error = errorText(query.error, query.first, query.last);
+  const currentUser = await getCurrentUser();
   const defaultTreatmentStartDate = toDateInput(new Date());
+  const defaultFeeFromUser = currentUser?.defaultSessionFeeNis ? String(currentUser.defaultSessionFeeNis) : "";
   return (
     <main className="space-y-4">
       <BackButton fallback="/patients" />
@@ -199,7 +214,7 @@ export default async function NewPatientPage({
               <div className="text-xs text-muted">תאריך לידה</div>
               <input name="dateOfBirth" type="date" lang="he-IL" className="app-field" />
             </label>
-            <div className="space-y-2 md:col-span-2 md:grid md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-start md:gap-2">
+            <div className="space-y-2 md:col-span-2 md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-start md:gap-3">
               <label className="space-y-1">
                 <div className="text-xs text-muted">תאריך התחלת טיפול</div>
                 <input
@@ -220,6 +235,7 @@ export default async function NewPatientPage({
               name="defaultSessionFeeNis"
               type="number"
               min="0"
+              defaultValue={defaultFeeFromUser}
               placeholder="מחיר טיפול קבוע (₪)"
               className="app-field"
             />
