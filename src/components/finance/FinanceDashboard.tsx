@@ -22,7 +22,30 @@ type ExpenseRow = {
   occurredAt: string;
 };
 
-export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[]; expenses: ExpenseRow[] }) {
+type UnpaidRow = {
+  sessionId: string;
+  scheduledAt: string; // ISO UTC
+  patientId: string;
+  patientName: string;
+  feeNis: number;
+  paidNis: number;
+  outstandingNis: number;
+};
+
+function fmtDateShort(isoStr: string): string {
+  // Client-side — browser uses local timezone automatically
+  return new Date(isoStr).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+}
+
+export function FinanceDashboard({
+  receipts,
+  expenses,
+  unpaidSessions,
+}: {
+  receipts: ReceiptRow[];
+  expenses: ExpenseRow[];
+  unpaidSessions: UnpaidRow[];
+}) {
   const { showToast } = useQuickActions();
   const [monthFilter, setMonthFilter] = useState("CURRENT");
   const [patientFilter, setPatientFilter] = useState("ALL");
@@ -34,14 +57,16 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
   const months = useMemo(() => {
     const set = new Set(receipts.map((r) => r.issuedAt.slice(0, 7)));
     expenses.forEach((e) => set.add(e.occurredAt.slice(0, 7)));
+    unpaidSessions.forEach((s) => set.add(s.scheduledAt.slice(0, 7)));
     return Array.from(set).sort().reverse();
-  }, [receipts, expenses]);
+  }, [receipts, expenses, unpaidSessions]);
 
   const patients = useMemo(() => {
-    const set = new Map<string, string>();
-    receipts.forEach((r) => set.set(r.patientId, r.patientName));
-    return Array.from(set.entries()).map(([id, name]) => ({ id, name }));
-  }, [receipts]);
+    const map = new Map<string, string>();
+    receipts.forEach((r) => map.set(r.patientId, r.patientName));
+    unpaidSessions.forEach((s) => map.set(s.patientId, s.patientName));
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "he"));
+  }, [receipts, unpaidSessions]);
 
   const resolvedMonth = monthFilter === "CURRENT" ? currentMonth : monthFilter;
 
@@ -56,8 +81,17 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
     return true;
   });
 
+  const filteredUnpaid = unpaidSessions.filter((s) => {
+    if (resolvedMonth !== "ALL" && !s.scheduledAt.startsWith(resolvedMonth)) return false;
+    if (viewMode === "PATIENTS" && patientFilter !== "ALL" && s.patientId !== patientFilter) return false;
+    return true;
+  });
+
   const totalIncome = filteredReceipts.reduce((sum, r) => sum + r.amountNis, 0);
   const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amountNis, 0);
+  const totalOutstanding = filteredUnpaid.reduce((sum, s) => sum + s.outstandingNis, 0);
+  const netProfit = totalIncome - totalExpenses;
+
   const incomeByPatient = (() => {
     const map = new Map<string, number>();
     filteredReceipts.forEach((r) => map.set(r.patientName, (map.get(r.patientName) ?? 0) + r.amountNis));
@@ -121,6 +155,7 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-4">
+      {/* Header */}
       <section className="app-section">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">כספים</h1>
@@ -138,64 +173,89 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr]">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-black/10 bg-white/90 px-3 py-2">
-              <div className="text-xs text-muted">סה״כ הכנסות</div>
-              <div className="text-lg font-semibold">₪{totalIncome.toLocaleString("he-IL")}</div>
+        {/* KPIs — 4 cards */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* חובות פתוחים */}
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+            <div className="mb-0.5 flex items-center justify-between">
+              <div className="text-xs text-rose-600">חובות פתוחים</div>
+              {filteredUnpaid.length > 0 && (
+                <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {filteredUnpaid.length}
+                </span>
+              )}
             </div>
-            <div className="rounded-xl border border-black/10 bg-white/90 px-3 py-2">
-              <div className="text-xs text-muted">סה״כ הוצאות</div>
-              <div className="text-lg font-semibold">₪{totalExpenses.toLocaleString("he-IL")}</div>
+            <div className="text-lg font-semibold text-rose-700">
+              ₪{totalOutstanding.toLocaleString("he-IL")}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="app-select"
-              value={monthFilter}
-              onChange={(e) => setMonthFilter(e.target.value)}
-              aria-label="בחירת תקופה"
-            >
-              <option value="CURRENT">חודש נוכחי</option>
-              <option value="ALL">כל השנה</option>
-              {months.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-            <select
-              className="app-select"
-              value={patientFilter}
-              onChange={(e) => setPatientFilter(e.target.value)}
-              aria-label="בחירת מטופל"
-            >
-              <option value="ALL">כל המטופלים</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className={`app-btn !px-3 !py-1.5 text-xs ${
-                viewMode === "CLINIC"
-                  ? "app-btn-primary"
-                  : "app-btn-secondary"
-              }`}
-              onClick={() => {
-                const next = viewMode === "CLINIC" ? "PATIENTS" : "CLINIC";
-                setViewMode(next);
-                if (next === "CLINIC") {
-                  setPatientFilter("ALL");
-                  setMonthFilter("ALL");
-                }
-              }}
-            >
-              מבט על הקליניקה
-            </button>
+          {/* הכנסות */}
+          <div className="rounded-xl border border-black/10 bg-white/90 px-3 py-2">
+            <div className="text-xs text-muted">הכנסות (קבלות)</div>
+            <div className="text-lg font-semibold">₪{totalIncome.toLocaleString("he-IL")}</div>
           </div>
+
+          {/* הוצאות */}
+          <div className="rounded-xl border border-black/10 bg-white/90 px-3 py-2">
+            <div className="text-xs text-muted">הוצאות</div>
+            <div className="text-lg font-semibold">₪{totalExpenses.toLocaleString("he-IL")}</div>
+          </div>
+
+          {/* רווח נקי */}
+          <div className={`rounded-xl border px-3 py-2 ${netProfit >= 0 ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
+            <div className={`text-xs ${netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>רווח נקי</div>
+            <div className={`text-lg font-semibold ${netProfit >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+              {netProfit < 0 ? "-" : ""}₪{Math.abs(netProfit).toLocaleString("he-IL")}
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            className="app-select"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            aria-label="בחירת תקופה"
+          >
+            <option value="CURRENT">חודש נוכחי</option>
+            <option value="ALL">כל השנה</option>
+            {months.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+          <select
+            className="app-select"
+            value={patientFilter}
+            onChange={(e) => setPatientFilter(e.target.value)}
+            aria-label="בחירת מטופל"
+          >
+            <option value="ALL">כל המטופלים</option>
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={`app-btn !px-3 !py-1.5 text-xs ${
+              viewMode === "CLINIC" ? "app-btn-primary" : "app-btn-secondary"
+            }`}
+            onClick={() => {
+              const next = viewMode === "CLINIC" ? "PATIENTS" : "CLINIC";
+              setViewMode(next);
+              if (next === "CLINIC") {
+                setPatientFilter("ALL");
+                setMonthFilter("ALL");
+              }
+            }}
+          >
+            מבט על הקליניקה
+          </button>
         </div>
       </section>
 
+      {/* Charts */}
       <section className="grid gap-4 lg:grid-cols-[1fr_1.5fr]">
         <section className="app-section">
           <h2 className="mb-2 text-sm font-semibold">פילוח לפי מטופלים</h2>
@@ -262,11 +322,78 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
         </section>
       </section>
 
+      {/* Unpaid Sessions — חובות פתוחים */}
+      <section className="app-section">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            חובות פתוחים
+            {filteredUnpaid.length > 0 && (
+              <span className="mr-2 text-xs font-normal text-muted">
+                {filteredUnpaid.length} פגישות · ₪{totalOutstanding.toLocaleString("he-IL")}
+              </span>
+            )}
+          </h2>
+        </div>
+        {filteredUnpaid.length === 0 ? (
+          <div className="rounded-lg bg-black/[0.02] px-3 py-4 text-center text-sm text-muted">
+            אין חובות פתוחים בתקופה זו 🎉
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-black/10 text-right text-xs text-muted">
+                  <th className="p-2 font-medium">תאריך</th>
+                  <th className="p-2 font-medium">מטופל</th>
+                  <th className="p-2 font-medium">מחיר</th>
+                  <th className="p-2 font-medium">שולם</th>
+                  <th className="p-2 font-medium text-rose-600">יתרה</th>
+                  <th className="p-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUnpaid.map((row) => (
+                  <tr key={row.sessionId} className="border-b border-black/5 hover:bg-black/[0.015]">
+                    <td className="p-2 tabular-nums">{fmtDateShort(row.scheduledAt)}</td>
+                    <td className="max-w-36 truncate p-2">
+                      <Link href={`/patients/${row.patientId}`} className="text-accent hover:underline">
+                        {row.patientName}
+                      </Link>
+                    </td>
+                    <td className="p-2 tabular-nums">₪{row.feeNis}</td>
+                    <td className="p-2 tabular-nums text-muted">
+                      {row.paidNis > 0 ? `₪${row.paidNis}` : "—"}
+                    </td>
+                    <td className="p-2 tabular-nums font-semibold text-rose-600">₪{row.outstandingNis}</td>
+                    <td className="p-2">
+                      <Link
+                        href={`/receipts/new?patientId=${row.patientId}`}
+                        className="rounded-md border border-accent/25 bg-accent-soft px-2 py-0.5 text-xs text-accent hover:bg-accent/10"
+                      >
+                        הפק קבלה
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-black/10 bg-black/[0.02]">
+                  <td colSpan={4} className="p-2 text-xs text-muted">סה״כ חובות</td>
+                  <td className="p-2 tabular-nums font-semibold text-rose-600">₪{totalOutstanding.toLocaleString("he-IL")}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Receipts + Expenses */}
       <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <section className="app-section">
           <h2 className="mb-2 text-sm font-semibold">קבלות שהופקו</h2>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
+            <table className="w-full min-w-[540px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-black/10 text-right text-xs text-muted">
                   <th className="p-2 font-medium">מס׳ קבלה</th>
@@ -278,7 +405,7 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
               </thead>
               <tbody>
                 {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id} className="border-b border-black/5">
+                  <tr key={receipt.id} className="border-b border-black/5 hover:bg-black/[0.015]">
                     <td className="p-2 font-mono text-xs">
                       <Link href={`/receipts/${receipt.id}`} className="text-accent hover:underline">
                         {receipt.receiptNumber}
@@ -290,7 +417,7 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
                         {receipt.patientName}
                       </Link>
                     </td>
-                    <td className="p-2">₪{receipt.amountNis}</td>
+                    <td className="p-2 tabular-nums">₪{receipt.amountNis}</td>
                     <td className="p-2">
                       <Link href={`/receipts/${receipt.id}`} className="text-accent hover:underline">
                         {receipt.allocations} פגישות
@@ -298,7 +425,21 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
                     </td>
                   </tr>
                 ))}
+                {filteredReceipts.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-3 text-center text-sm text-muted">אין קבלות בתקופה זו</td>
+                  </tr>
+                )}
               </tbody>
+              {filteredReceipts.length > 0 && (
+                <tfoot>
+                  <tr className="border-t border-black/10 bg-black/[0.02]">
+                    <td colSpan={3} className="p-2 text-xs text-muted">סה״כ הכנסות</td>
+                    <td className="p-2 tabular-nums font-semibold">₪{totalIncome.toLocaleString("he-IL")}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </section>
@@ -319,6 +460,12 @@ export function FinanceDashboard({ receipts, expenses }: { receipts: ReceiptRow[
               </div>
             ))}
             {filteredExpenses.length === 0 ? <div className="text-sm text-muted">אין הוצאות שהוזנו.</div> : null}
+            {filteredExpenses.length > 0 && (
+              <div className="flex items-center justify-between border-t border-black/10 px-3 pt-2 text-xs text-muted">
+                <span>סה״כ הוצאות</span>
+                <span className="tabular-nums font-semibold">₪{totalExpenses.toLocaleString("he-IL")}</span>
+              </div>
+            )}
           </div>
         </section>
       </section>
