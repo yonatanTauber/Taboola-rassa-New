@@ -3,25 +3,27 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useQuickActions } from "@/components/QuickActions";
+import { PatientStatusDialog } from "@/components/patients/PatientStatusDialog";
 
 export function PatientArchiveMenu({
   patientId,
   editPatientHref,
   editLayoutHref,
   intakeHref,
+  isInactive = false,
 }: {
   patientId: string;
   editPatientHref: string;
   editLayoutHref: string;
   intakeHref: string;
+  isInactive?: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useQuickActions();
   const [open, setOpen] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const [archiving, setArchiving] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
 
   return (
     <div className="relative">
@@ -29,7 +31,7 @@ export function PatientArchiveMenu({
         ⋯
       </button>
       {open ? (
-        <div className="absolute left-0 top-9 z-20 min-w-44 rounded-lg border border-black/12 bg-white p-2 shadow-sm">
+        <div className="absolute left-0 top-9 z-20 min-w-48 rounded-lg border border-black/12 bg-white p-2 shadow-sm">
           <Link
             href={editPatientHref}
             onClick={() => setOpen(false)}
@@ -51,37 +53,57 @@ export function PatientArchiveMenu({
           >
             עריכת הדף
           </Link>
-          <button
-            type="button"
-            className="mt-1 w-full rounded-md px-2 py-1 text-right text-sm text-danger hover:bg-danger/10"
-            onClick={async () => {
-              setOpen(false);
-              setArchiveOpen(true);
-            }}
-          >
-            העברה לארכיון
-          </button>
+          {!isInactive ? (
+            <button
+              type="button"
+              className="mt-1 w-full rounded-md px-2 py-1 text-right text-sm text-danger hover:bg-danger/10"
+              onClick={async () => {
+                setOpen(false);
+                setStatusDialogOpen(true);
+              }}
+            >
+              העברה למטופל לא פעיל
+            </button>
+          ) : null}
         </div>
       ) : null}
-      <ConfirmDialog
-        open={archiveOpen}
-        title="להעביר מטופל לארכיון?"
-        message="ניתן יהיה לראות את המטופל בדף הארכיון."
-        confirmLabel="העבר לארכיון"
-        cancelLabel="ביטול"
-        busy={archiving}
-        onCancel={() => setArchiveOpen(false)}
-        onConfirm={async () => {
-          setArchiving(true);
-          const res = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
-          setArchiving(false);
+
+      <PatientStatusDialog
+        open={statusDialogOpen}
+        mode="setInactive"
+        busy={savingStatus}
+        onCancel={() => setStatusDialogOpen(false)}
+        onSubmit={async (payload) => {
+          setSavingStatus(true);
+          const res = await fetch(`/api/patients/${patientId}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "set_inactive",
+              inactiveAt: payload.date,
+              reason: payload.reason || null,
+              cancelFutureSessions: payload.cancelFutureSessions,
+              closeOpenTasks: payload.closeOpenTasks,
+            }),
+          });
+          const responsePayload = (await res.json().catch(() => ({}))) as {
+            error?: string;
+            canceledSessionsCount?: number;
+            closedTasksCount?: number;
+          };
+          setSavingStatus(false);
+
           if (!res.ok) {
-            showToast({ message: "העברה לארכיון נכשלה" });
+            showToast({ message: responsePayload.error ?? "העברה למטופל לא פעיל נכשלה" });
             return;
           }
-          showToast({ message: "המטופל הועבר לארכיון" });
-          setArchiveOpen(false);
-          router.push("/patients");
+
+          const canceledSessions = Number(responsePayload.canceledSessionsCount ?? 0);
+          const closedTasks = Number(responsePayload.closedTasksCount ?? 0);
+          showToast({
+            message: `המטופל הועבר ללא פעיל${canceledSessions || closedTasks ? ` · בוטלו ${canceledSessions} פגישות ונסגרו ${closedTasks} משימות` : ""}`,
+          });
+          setStatusDialogOpen(false);
           router.refresh();
         }}
       />

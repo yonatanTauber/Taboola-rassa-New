@@ -47,7 +47,7 @@ export default async function PatientIntakePage({ params }: { params: Promise<{ 
   const { id } = await params;
 
   const patient = await prisma.patient.findFirst({
-    where: { id, ownerUserId: userId, archivedAt: null },
+    where: { id, ownerUserId: userId },
     include: { intakes: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
   if (!patient) return notFound();
@@ -59,6 +59,7 @@ export default async function PatientIntakePage({ params }: { params: Promise<{ 
       <section className="app-section">
         <h1 className="text-xl font-semibold">אינטייק מטופל</h1>
         <p className="text-sm text-muted">{patient.firstName} {patient.lastName}</p>
+        {patient.archivedAt ? <p className="mt-1 text-xs text-amber-700">המטופל במצב לא פעיל. ניתן לערוך את התיעוד ולהשיב אותו לפעיל מדף המטופל.</p> : null}
       </section>
 
       <section className="app-section">

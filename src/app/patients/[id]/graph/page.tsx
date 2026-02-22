@@ -12,7 +12,7 @@ export default async function PatientGraphPage({ params }: { params: Promise<{ i
   const { id } = await params;
 
   const patient = await prisma.patient.findFirst({
-    where: { id, archivedAt: null, ownerUserId: userId },
+    where: { id, ownerUserId: userId },
     include: {
       sessions: {
         orderBy: { scheduledAt: "desc" },

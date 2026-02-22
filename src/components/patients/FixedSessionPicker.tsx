@@ -6,13 +6,14 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
 
 const DAY_OPTIONS = [
-  { value: "1", label: "א׳" },
-  { value: "2", label: "ב׳" },
-  { value: "3", label: "ג׳" },
-  { value: "4", label: "ד׳" },
-  { value: "5", label: "ה׳" },
-  { value: "6", label: "ו׳" },
-  { value: "0", label: "ש׳" },
+  { value: "", label: "ללא יום קבוע" },
+  { value: "1", label: "ראשון" },
+  { value: "2", label: "שני" },
+  { value: "3", label: "שלישי" },
+  { value: "4", label: "רביעי" },
+  { value: "5", label: "חמישי" },
+  { value: "6", label: "שישי" },
+  { value: "0", label: "שבת" },
 ];
 
 export function FixedSessionPicker({
@@ -29,74 +30,77 @@ export function FixedSessionPicker({
   const [minute, setMinute] = useState("");
 
   const hasDay = day !== "";
-  const dayLabel = useMemo(() => DAY_OPTIONS.find((item) => item.value === day)?.label ?? "ללא יום", [day]);
+  const dayLabel = useMemo(() => DAY_OPTIONS.find((item) => item.value === day)?.label ?? "ללא יום קבוע", [day]);
 
   return (
-    <div className="space-y-2 rounded-xl border border-black/12 bg-black/[0.02] p-3">
+    <div className="rounded-xl border border-black/12 bg-black/[0.02] p-3">
       <input type="hidden" name={dayInputName} value={day} />
       <input type="hidden" name={hourInputName} value={hasDay ? hour : ""} />
       <input type="hidden" name={minuteInputName} value={hasDay ? minute : ""} />
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => {
-            setDay("");
-            setHour("");
-            setMinute("");
-          }}
-          className={`app-btn !h-8 !px-2 !py-0 text-xs ${!hasDay ? "app-btn-primary" : "app-btn-secondary"}`}
-          aria-pressed={!hasDay}
-        >
-          ללא
-        </button>
-        {DAY_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setDay(option.value)}
-            className={`app-btn !h-8 !w-8 !px-0 !py-0 text-xs ${day === option.value ? "app-btn-primary" : "app-btn-secondary"}`}
-            aria-label={`יום קבוע ${option.label}`}
-            aria-pressed={day === option.value}
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
+        <label className="space-y-1">
+          <span className="text-xs text-muted">יום קבוע</span>
+          <select
+            value={day}
+            onChange={(event) => {
+              const nextDay = event.target.value;
+              setDay(nextDay);
+              if (!nextDay) {
+                setHour("");
+                setMinute("");
+              }
+            }}
+            className="app-select"
           >
-            {option.label}
-          </button>
-        ))}
+            {DAY_OPTIONS.map((option) => (
+              <option key={option.value || "none"} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1">
+          <span className="text-xs text-muted">שעה</span>
+          <select
+            value={hour}
+            onChange={(event) => setHour(event.target.value)}
+            className="app-select"
+            disabled={!hasDay}
+            aria-label="שעה קבועה"
+          >
+            <option value="">שעה</option>
+            {HOURS.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1">
+          <span className="text-xs text-muted">דקות</span>
+          <select
+            value={minute}
+            onChange={(event) => setMinute(event.target.value)}
+            className="app-select"
+            disabled={!hasDay}
+            aria-label="דקות קבועות"
+          >
+            <option value="">דקות</option>
+            {MINUTES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted">יום: {dayLabel}</span>
-        <span className="text-xs text-muted">בשעה</span>
-        <select
-          value={hour}
-          onChange={(event) => setHour(event.target.value)}
-          className="app-select app-select-compact app-time-select"
-          disabled={!hasDay}
-          aria-label="שעה קבועה"
-        >
-          <option value="">שעה</option>
-          {HOURS.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-        <span className="text-sm text-muted">:</span>
-        <select
-          value={minute}
-          onChange={(event) => setMinute(event.target.value)}
-          className="app-select app-select-compact app-time-select"
-          disabled={!hasDay}
-          aria-label="דקות קבועות"
-        >
-          <option value="">דקות</option>
-          {MINUTES.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-      </div>
+      <p className="mt-2 text-xs text-muted">
+        {hasDay ? `יום קבוע: ${dayLabel}${hour && minute ? ` · ${hour}:${minute}` : ""}` : "לא נקבע יום ושעה קבועים"}
+      </p>
     </div>
   );
 }

@@ -10,6 +10,7 @@ export default async function SettingsPage() {
       initialProfile={{
         therapistName: currentUser?.fullName ?? "",
         email: currentUser?.email ?? "",
+        defaultFee: currentUser?.defaultSessionFeeNis ?? undefined,
       }}
       canManageInvites={canManageInvites}
     />

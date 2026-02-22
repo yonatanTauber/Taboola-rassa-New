@@ -12,6 +12,7 @@ type TaskRow = {
   dueAt?: string;
   patientId?: string;
   patientName?: string;
+  patientInactive?: boolean;
   sessionId?: string;
 };
 
@@ -134,7 +135,10 @@ export function TasksWorkspace({
               <div className={`rounded-full px-2 py-0.5 text-xs ${badgeTone(task.status)}`}>{statusLabel(task.status)}</div>
             </div>
             <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted">
-              <div>{task.patientName ? `מטופל: ${task.patientName}` : "משימה כללית"}</div>
+              <div>
+                {task.patientName ? `מטופל: ${task.patientName}` : "משימה כללית"}
+                {task.patientName && task.patientInactive ? " · לא פעיל" : ""}
+              </div>
               <div>{task.dueAt ? new Date(task.dueAt).toLocaleDateString("he-IL") : "ללא תאריך"}</div>
             </div>
           </div>

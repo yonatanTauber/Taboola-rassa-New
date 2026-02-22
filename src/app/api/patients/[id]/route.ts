@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCurrentUserId } from "@/lib/auth-server";
+import { PatientStatusError, setPatientInactiveById } from "@/lib/patient-status";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
@@ -7,12 +8,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const { id } = await params;
   const body = await req.json();
 
   const existing = await prisma.patient.findFirst({ where: { id, ownerUserId: userId } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) return NextResponse.json({ error: "המטופל לא נמצא." }, { status: 404 });
 
   const updated = await prisma.patient.update({
     where: { id },
@@ -62,15 +63,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const { id } = await params;
-  const existing = await prisma.patient.findFirst({ where: { id, ownerUserId: userId } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.patient.update({
-    where: { id },
-    data: { archivedAt: new Date() },
-  });
+  try {
+    await setPatientInactiveById({
+      patientId: id,
+      actorUserId: userId,
+      inactiveAt: new Date(),
+      reason: null,
+      cancelFutureSessions: false,
+      closeOpenTasks: false,
+    });
+  } catch (error) {
+    if (error instanceof PatientStatusError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
+    return NextResponse.json({ error: "עדכון מצב המטופל נכשל." }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true, archived: true });
+  return NextResponse.json({ ok: true, inactive: true });
 }

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const status = normalizeStatus(searchParams.get("status"));
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
 
   const body = await req.json();
   const patientId = String(body.patientId ?? "").trim();
@@ -75,14 +75,14 @@ export async function POST(req: Request) {
   const sessionIds = parseSessionIds(body.sessionIds);
 
   if (!patientId) {
-    return NextResponse.json({ error: "Missing patientId" }, { status: 400 });
+    return NextResponse.json({ error: "חובה לבחור מטופל." }, { status: 400 });
   }
 
   const patient = await prisma.patient.findFirst({
-    where: { id: patientId, ownerUserId: userId },
+    where: { id: patientId, ownerUserId: userId, archivedAt: null },
     select: { id: true },
   });
-  if (!patient) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+  if (!patient) return NextResponse.json({ error: "לא ניתן ליצור הדרכה למטופל לא פעיל או לא קיים." }, { status: 400 });
 
   if (instructorId) {
     const instructor = await prisma.instructor.findFirst({
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
       select: { id: true },
     });
     if (!instructor) {
-      return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
+      return NextResponse.json({ error: "המדריך שנבחר לא נמצא." }, { status: 404 });
     }
   }
 
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
       },
     });
     if (validCount !== sessionIds.length) {
-      return NextResponse.json({ error: "Invalid session links" }, { status: 400 });
+      return NextResponse.json({ error: "רשימת פגישות לקישור אינה תקינה." }, { status: 400 });
     }
   }
 

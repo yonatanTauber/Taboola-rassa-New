@@ -25,16 +25,21 @@ async function generateReceiptNumber() {
 
 export async function POST(req: Request) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const body = await req.json();
   const patientId = String(body.patientId ?? "").trim();
   const allocationsRaw = Array.isArray(body.allocations) ? body.allocations : [];
 
   if (!patientId || allocationsRaw.length === 0) {
-    return NextResponse.json({ error: "Missing data" }, { status: 400 });
+    return NextResponse.json({ error: "חסרים נתונים להפקת קבלה." }, { status: 400 });
   }
-  const patient = await prisma.patient.findFirst({ where: { id: patientId, ownerUserId: userId }, select: { id: true } });
-  if (!patient) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, ownerUserId: userId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!patient) {
+    return NextResponse.json({ error: "לא ניתן להפיק קבלה למטופל לא פעיל או לא קיים." }, { status: 400 });
+  }
 
   const allocations: AllocationInput[] = allocationsRaw
     .map((item: unknown) => {
@@ -47,17 +52,17 @@ export async function POST(req: Request) {
     .filter((item: AllocationInput) => item.sessionId && Number.isFinite(item.amountNis) && item.amountNis > 0);
 
   if (allocations.length === 0) {
-    return NextResponse.json({ error: "No valid allocations" }, { status: 400 });
+    return NextResponse.json({ error: "לא נמצאו הקצאות תקינות לקבלה." }, { status: 400 });
   }
   const sessionsCount = await prisma.session.count({
     where: {
       id: { in: allocations.map((a) => a.sessionId) },
       patientId,
-      patient: { ownerUserId: userId },
+      patient: { ownerUserId: userId, archivedAt: null },
     },
   });
   if (sessionsCount !== allocations.length) {
-    return NextResponse.json({ error: "Invalid session allocation list" }, { status: 400 });
+    return NextResponse.json({ error: "רשימת ההקצאות אינה תקינה." }, { status: 400 });
   }
 
   const amountNis = allocations.reduce((sum, item) => sum + item.amountNis, 0);

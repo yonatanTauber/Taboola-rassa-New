@@ -14,9 +14,7 @@ async function createInquiry(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const gender = String(formData.get("gender") ?? "").trim();
-  const age = Number(formData.get("age") ?? 0);
   const referralSource = String(formData.get("referralSource") ?? "").trim();
-  const referralDetails = String(formData.get("referralDetails") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
 
   if (!firstName || !lastName || !phone) return;
@@ -28,9 +26,7 @@ async function createInquiry(formData: FormData) {
       lastName,
       phone,
       gender: gender === "MALE" || gender === "FEMALE" || gender === "OTHER" ? gender : null,
-      age: Number.isFinite(age) && age > 0 ? age : null,
       referralSource: referralSource || null,
-      referralDetails: referralDetails || null,
       notes: notes || null,
     },
   });
@@ -55,7 +51,11 @@ export default async function InquiriesPage() {
   if (!userId) return null;
   const inquiries = await prisma.inquiry.findMany({
     where: { ownerUserId: userId },
-    include: { patient: { select: { id: true, firstName: true, lastName: true } } },
+    include: {
+      patient: {
+        select: { id: true, firstName: true, lastName: true, archivedAt: true },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
@@ -69,7 +69,6 @@ export default async function InquiriesPage() {
             <input name="firstName" required placeholder="שם פרטי *" className="app-field" />
             <input name="lastName" required placeholder="שם משפחה *" className="app-field" />
             <input name="phone" required placeholder="טלפון *" className="app-field" />
-            <input name="age" type="number" min="1" placeholder="גיל" className="app-field" />
             <select name="gender" className="app-select">
               <option value="">מגדר (אופציונלי)</option>
               <option value="MALE">גבר</option>
@@ -78,7 +77,6 @@ export default async function InquiriesPage() {
             </select>
             <input name="referralSource" placeholder="מקור פנייה" className="app-field" />
           </div>
-          <input name="referralDetails" placeholder="פירוט מקור הפנייה (קולגה, ארגון...)" className="app-field" />
           <textarea name="notes" placeholder="הערות על הפנייה" className="app-textarea min-h-24" />
           <div className="flex justify-end">
             <button className="app-btn app-btn-primary">שמור</button>
@@ -96,7 +94,7 @@ export default async function InquiriesPage() {
                 <th className="p-2 font-medium">טלפון</th>
                 <th className="p-2 font-medium">מקור</th>
                 <th className="p-2 font-medium">סטטוס</th>
-                <th className="p-2 font-medium">קישור</th>
+                <th className="p-2 font-medium">מטופל מקושר</th>
                 <th className="p-2 font-medium">פעולה</th>
               </tr>
             </thead>
@@ -107,13 +105,22 @@ export default async function InquiriesPage() {
                   <td className="p-2">{inquiry.phone}</td>
                   <td className="p-2">{inquiry.referralSource ?? "—"}</td>
                   <td className="p-2">
-                    <InquiryStatusField inquiryId={inquiry.id} initialStatus={inquiry.status} />
+                    <InquiryStatusField
+                      inquiryId={inquiry.id}
+                      initialStatus={inquiry.status}
+                      patientId={inquiry.patient?.id ?? inquiry.patientId ?? null}
+                    />
                   </td>
                   <td className="p-2">
                     {inquiry.patient ? (
-                      <Link href={`/patients/${inquiry.patient.id}`} className="text-accent hover:underline">
-                        {inquiry.patient.firstName} {inquiry.patient.lastName}
-                      </Link>
+                      <div className="space-y-1">
+                        <Link href={`/patients/${inquiry.patient.id}`} className="text-accent hover:underline">
+                          {inquiry.patient.firstName} {inquiry.patient.lastName}
+                        </Link>
+                        {inquiry.patient.archivedAt ? (
+                          <div className="text-xs text-amber-700">המטופל כרגע לא פעיל</div>
+                        ) : null}
+                      </div>
                     ) : (
                       <span className="text-muted">לא קושר</span>
                     )}
@@ -124,6 +131,8 @@ export default async function InquiriesPage() {
                         <input type="hidden" name="inquiryId" value={inquiry.id} />
                         <button className="app-btn app-btn-primary">הפוך למטופל</button>
                       </form>
+                    ) : inquiry.status === "CONVERTED" ? (
+                      <span className="text-xs text-muted">סטטוס נעול</span>
                     ) : (
                       <span className="text-xs text-muted">—</span>
                     )}

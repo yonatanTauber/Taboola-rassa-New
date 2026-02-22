@@ -7,7 +7,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const { id } = await params;
   const body = await req.json();
 
@@ -21,14 +21,16 @@ export async function PATCH(
       ],
     },
   });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) return NextResponse.json({ error: "המשימה לא נמצאה." }, { status: 404 });
 
   if (typeof body.patientId === "string" && body.patientId) {
     const patient = await prisma.patient.findFirst({
-      where: { id: body.patientId, ownerUserId: userId },
+      where: { id: body.patientId, ownerUserId: userId, archivedAt: null },
       select: { id: true },
     });
-    if (!patient) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+    if (!patient) {
+      return NextResponse.json({ error: "לא ניתן לשייך משימה למטופל לא פעיל או לא קיים." }, { status: 400 });
+    }
   }
 
   const updated = await prisma.task.update({
@@ -62,7 +64,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const { id } = await params;
   const existing = await prisma.task.findFirst({
     where: {
@@ -75,7 +77,7 @@ export async function DELETE(
     },
     select: { id: true },
   });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) return NextResponse.json({ error: "המשימה לא נמצאה." }, { status: 404 });
   await prisma.task.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

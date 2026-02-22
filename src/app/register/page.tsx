@@ -2,7 +2,6 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AppLogo } from "@/components/AppLogo";
 
 const PROFESSION_OPTIONS = [
@@ -14,7 +13,6 @@ const PROFESSION_OPTIONS = [
 ];
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +20,7 @@ export default function RegisterPage() {
   const [profession, setProfession] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [defaultSessionFeeNis, setDefaultSessionFeeNis] = useState("350");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,7 +31,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fullName, email, password, profession, dateOfBirth, inviteCode }),
+      body: JSON.stringify({ fullName, email, password, profession, dateOfBirth, inviteCode, defaultSessionFeeNis }),
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({ error: "לא ניתן להשלים הרשמה כרגע." }))) as { error?: string };
@@ -40,8 +39,7 @@ export default function RegisterPage() {
       setLoading(false);
       return;
     }
-    router.replace("/");
-    router.refresh();
+    window.location.assign("/");
   }
 
   return (
@@ -112,6 +110,18 @@ export default function RegisterPage() {
               autoComplete="bday"
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
+              className="app-field mt-1"
+            />
+          </label>
+
+          <label className="block text-sm text-muted">
+            ברירת מחדל עלות טיפול (₪)
+            <input
+              type="number"
+              name="defaultSessionFeeNis"
+              min="0"
+              value={defaultSessionFeeNis}
+              onChange={(e) => setDefaultSessionFeeNis(e.target.value)}
               className="app-field mt-1"
             />
           </label>

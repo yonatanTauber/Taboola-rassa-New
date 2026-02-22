@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const body = await req.json();
   const title = String(body.title ?? "").trim();
   const dueAtRaw = String(body.dueAt ?? "").trim();
@@ -13,12 +13,17 @@ export async function POST(req: Request) {
   const patientId = String(body.patientId ?? "").trim();
 
   if (!title) {
-    return NextResponse.json({ error: "Missing title" }, { status: 400 });
+    return NextResponse.json({ error: "חובה להזין כותרת משימה." }, { status: 400 });
   }
 
   if (patientId) {
-    const patient = await prisma.patient.findFirst({ where: { id: patientId, ownerUserId: userId }, select: { id: true } });
-    if (!patient) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, ownerUserId: userId, archivedAt: null },
+      select: { id: true },
+    });
+    if (!patient) {
+      return NextResponse.json({ error: "לא ניתן לשייך משימה למטופל לא פעיל או לא קיים." }, { status: 400 });
+    }
   }
 
   const task = await prisma.task.create({

@@ -14,7 +14,15 @@ type Row = {
   sessionId?: string;
 };
 
-export function PatientTasksPanel({ tasks, patientId }: { tasks: Row[]; patientId: string }) {
+export function PatientTasksPanel({
+  tasks,
+  patientId,
+  patientInactive = false,
+}: {
+  tasks: Row[];
+  patientId: string;
+  patientInactive?: boolean;
+}) {
   const router = useRouter();
   const { showToast } = useQuickActions();
   const [q, setQ] = useState("");
@@ -34,16 +42,32 @@ export function PatientTasksPanel({ tasks, patientId }: { tasks: Row[]; patientI
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">משימות מטופל</h2>
-          <Link
-            href={`/tasks/new?patientId=${patientId}`}
-            className="app-btn app-btn-secondary h-7 w-7 !px-0 text-center text-sm"
-            title="הוספת משימה למטופל"
-          >
-            +
-          </Link>
+          {patientInactive ? (
+            <span
+              className="inline-flex h-7 w-7 cursor-not-allowed items-center justify-center rounded border border-black/12 bg-black/[0.05] text-center text-sm text-muted"
+              title="לא ניתן להוסיף משימה למטופל לא פעיל"
+            >
+              +
+            </span>
+          ) : (
+            <Link
+              href={`/tasks/new?patientId=${patientId}`}
+              className="app-btn app-btn-secondary h-7 w-7 !px-0 text-center text-sm"
+              title="הוספת משימה למטופל"
+            >
+              +
+            </Link>
+          )}
         </div>
         <Link href={`/tasks?patientId=${patientId}`} className="app-btn app-btn-secondary text-xs">מעבר לדף כל המשימות</Link>
       </div>
+
+      {patientInactive ? (
+        <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          המטופל במצב לא פעיל ולכן לא ניתן ליצור משימות חדשות.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={q}

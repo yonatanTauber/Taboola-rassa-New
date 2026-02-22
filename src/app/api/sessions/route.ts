@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   const userId = await requireCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "נדרשת התחברות." }, { status: 401 });
   const body = await req.json();
   const patientId = String(body.patientId ?? "").trim();
   const scheduledAtRaw = String(body.scheduledAt ?? "").trim();
@@ -14,12 +14,21 @@ export async function POST(req: Request) {
   const note = String(body.note ?? "").trim();
 
   if (!patientId || !scheduledAtRaw) {
-    return NextResponse.json({ error: "Missing patientId or scheduledAt" }, { status: 400 });
+    return NextResponse.json({ error: "חובה לבחור מטופל ותאריך פגישה." }, { status: 400 });
   }
-  const patient = await prisma.patient.findFirst({ where: { id: patientId, ownerUserId: userId }, select: { id: true } });
-  if (!patient) return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, ownerUserId: userId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!patient) {
+    return NextResponse.json({ error: "לא ניתן לקבוע פגישה למטופל לא פעיל או לא קיים." }, { status: 400 });
+  }
 
   const scheduledAt = new Date(scheduledAtRaw);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    return NextResponse.json({ error: "תאריך הפגישה לא תקין." }, { status: 400 });
+  }
+
   const status =
     note.length > 0 && scheduledAt.getTime() <= Date.now()
       ? SessionStatus.COMPLETED

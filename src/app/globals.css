@@ -36,12 +36,19 @@ body {
   color: var(--ink);
   overflow-x: hidden;
   width: 100%;
+  max-width: 100vw;
+  overscroll-behavior-x: none;
   background:
     radial-gradient(circle at 95% 0%, #f1e6d8 0%, transparent 30%),
     radial-gradient(circle at 0% 100%, #e3f1e8 0%, transparent 28%),
     linear-gradient(180deg, #f7f1e8 0%, #f3efe7 100%);
   font-family: var(--font-heebo), sans-serif;
   text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100dvh;
+  touch-action: pan-y;
 }
 
 .surface-card {

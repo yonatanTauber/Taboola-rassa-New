@@ -11,16 +11,19 @@ export default async function PatientsPage({
 }) {
   const params = (await searchParams) ?? {};
   const saved = typeof params.saved === "string" ? params.saved : "";
-  const view = typeof params.view === "string" ? params.view : "active";
-  const archivedMode = view === "archived";
+  const viewParam = typeof params.view === "string" ? params.view : "active";
+  const layoutParam = typeof params.layout === "string" ? params.layout : "table";
+  const inactiveMode = viewParam === "inactive" || viewParam === "archived";
+  const displayMode = layoutParam === "cards" ? "cards" : "table";
+
   const userId = await requireCurrentUserId();
   if (!userId) return null;
 
-  const [activeCount, archivedCount, patients] = await Promise.all([
+  const [activeCount, inactiveCount, patients] = await Promise.all([
     prisma.patient.count({ where: { archivedAt: null, ownerUserId: userId } }),
     prisma.patient.count({ where: { archivedAt: { not: null }, ownerUserId: userId } }),
     prisma.patient.findMany({
-      where: archivedMode
+      where: inactiveMode
         ? { archivedAt: { not: null }, ownerUserId: userId }
         : { archivedAt: null, ownerUserId: userId },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
@@ -48,28 +51,56 @@ export default async function PatientsPage({
   ).length;
 
   return (
-    <main className="grid gap-3 lg:grid-cols-[1.5fr_1fr]">
+    <main className="space-y-4">
+      <section className="app-section">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-xl font-semibold">מטופלים</h1>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-black/10 p-1 text-xs">
+              <Link
+                href={`/patients${inactiveMode ? "?view=inactive" : ""}`}
+                className={`rounded-md px-2 py-1 ${displayMode === "table" ? "bg-accent-soft text-accent" : "text-muted"}`}
+              >
+                טבלה
+              </Link>
+              <Link
+                href={`/patients?${inactiveMode ? "view=inactive&" : ""}layout=cards`}
+                className={`rounded-md px-2 py-1 ${displayMode === "cards" ? "bg-accent-soft text-accent" : "text-muted"}`}
+              >
+                בלוקים
+              </Link>
+            </div>
+            <Link
+              href="/patients/new"
+              className="app-btn app-btn-primary !px-3 !py-1.5 text-sm"
+            >
+              מטופל חדש
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href="/patients"
-            className={`app-btn ${!archivedMode ? "app-btn-primary" : "app-btn-secondary"} !text-sm`}
+            href={displayMode === "cards" ? "/patients?layout=cards" : "/patients"}
+            className={`app-btn ${!inactiveMode ? "app-btn-primary" : "app-btn-secondary"} !text-sm`}
           >
-            מטופלים פעילים ({activeCount})
+            פעילים ({activeCount})
           </Link>
           <Link
-            href="/patients?view=archived"
-            className={`app-btn ${archivedMode ? "app-btn-primary" : "app-btn-secondary"} !text-sm`}
+            href={`/patients?view=inactive${displayMode === "cards" ? "&layout=cards" : ""}`}
+            className={`app-btn ${inactiveMode ? "app-btn-primary" : "app-btn-secondary"} !text-sm`}
           >
-            מטופלי ארכיון ({archivedCount})
+            לא פעילים ({inactiveCount})
           </Link>
         </div>
 
-        {!archivedMode && saved ? <Notice text="מטופל חדש נשמר בהצלחה." /> : null}
-        {archivedMode ? <Notice text="תצוגת ארכיון מטופלים פעילה." /> : null}
+        {!inactiveMode && saved ? <Notice text="מטופל חדש נשמר בהצלחה." /> : null}
+        {inactiveMode ? <Notice text="תצוגת מטופלים לא פעילים פעילה." /> : null}
 
         <div className="grid gap-3 md:grid-cols-3">
-          <StatCard label={archivedMode ? "סה״כ בארכיון" : "סה״כ מטופלים"} value={String(total)} />
+          <StatCard label={inactiveMode ? "סה״כ לא פעילים" : "סה״כ מטופלים"} value={String(total)} />
           <StatCard label="מטופלים למעקב" value={String(needsContact)} />
           <StatCard label="מטופלים פעילים" value={String(activeThisWeek)} />
         </div>
@@ -91,18 +122,9 @@ export default async function PatientsPage({
             openTasksCount: p.tasks.length,
             archivedAt: p.archivedAt ? p.archivedAt.toISOString() : null,
           }))}
-          archivedMode={archivedMode}
+          archivedMode={inactiveMode}
+          displayMode={displayMode}
         />
-      </section>
-
-      <section className="app-section">
-        <h2 className="mb-3 text-lg font-semibold">פעולות</h2>
-        <Link
-          href="/patients/new"
-          className="inline-flex w-full items-center justify-center rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-medium transition hover:bg-accent-soft"
-        >
-          פתיחת טופס מטופל חדש
-        </Link>
       </section>
     </main>
   );

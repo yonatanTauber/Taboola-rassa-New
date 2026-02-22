@@ -1,5 +1,5 @@
 export function isAdminEmail(email: string | null | undefined) {
-  const normalized = String(email ?? "").trim().toLowerCase();
+  const normalized = normalizeEmail(email);
   if (!normalized) return false;
 
   const configured = getConfiguredAdminEmails();
@@ -10,8 +10,22 @@ export function isAdminEmail(email: string | null | undefined) {
 }
 
 function getConfiguredAdminEmails() {
-  return String(process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
+  const raw = [process.env.ADMIN_EMAILS, process.env.ADMIN_EMAIL]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(",");
+
+  return Array.from(
+    new Set(
+      raw
+        .split(/[,\n;\s]+/g)
+        .map((item) => item.replace(/^["']+|["']+$/g, ""))
+        .map((item) => normalizeEmail(item))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function normalizeEmail(value: string | null | undefined) {
+  return String(value ?? "").trim().toLowerCase();
 }

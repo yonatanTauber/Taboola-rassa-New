@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Caveat, Heebo, IBM_Plex_Mono } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { QuickActionsProvider } from "@/components/QuickActions";
@@ -26,6 +26,14 @@ const caveat = Caveat({
 export const metadata: Metadata = {
   title: "Tabula Rassa",
   description: "פלטפורמת ניהול קליניקה ומחקר למטפלים",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({

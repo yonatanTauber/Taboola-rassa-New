@@ -18,10 +18,12 @@ export function PatientSessionsPanel({
   rows,
   nowIso,
   patientId,
+  patientInactive = false,
 }: {
   rows: Row[];
   nowIso: string;
   patientId: string;
+  patientInactive?: boolean;
 }) {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [includeCancellations, setIncludeCancellations] = useState(false);
@@ -58,14 +60,23 @@ export function PatientSessionsPanel({
     <section className="app-section space-y-3 border-black/18">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">פגישות פגישה</h2>
-          <Link
-            href={`/sessions/new?patientId=${patientId}`}
-            className="app-btn app-btn-secondary h-7 w-7 !px-0 text-center text-sm"
-            title="הוספת פגישה למטופל"
-          >
-            +
-          </Link>
+          <h2 className="text-lg font-semibold">פגישות טיפול</h2>
+          {patientInactive ? (
+            <span
+              className="inline-flex h-7 w-7 cursor-not-allowed items-center justify-center rounded border border-black/12 bg-black/[0.05] text-center text-sm text-muted"
+              title="לא ניתן להוסיף פגישה למטופל לא פעיל"
+            >
+              +
+            </span>
+          ) : (
+            <Link
+              href={`/sessions/new?patientId=${patientId}`}
+              className="app-btn app-btn-secondary h-7 w-7 !px-0 text-center text-sm"
+              title="הוספת פגישה למטופל"
+            >
+              +
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <label className="inline-flex items-center gap-2 text-xs text-muted">
@@ -83,6 +94,12 @@ export function PatientSessionsPanel({
           </label>
         </div>
       </div>
+
+      {patientInactive ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          המטופל במצב לא פעיל ולכן לא ניתן לקבוע פגישות חדשות עד להשבה לפעיל.
+        </p>
+      ) : null}
 
       {includeCancellations ? (
         <div className="grid gap-2 md:grid-cols-2">

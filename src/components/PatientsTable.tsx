@@ -24,6 +24,7 @@ type ColumnKey = "name" | "phone" | "gender" | "age" | "lastSession" | "nextSess
 type SortDirection = "ASC" | "DESC";
 type GenderFilterKey = "MALE" | "FEMALE" | "OTHER";
 type AgeGroupFilterKey = Row["ageGroup"];
+type DisplayMode = "table" | "cards";
 
 type FilterCheckboxItem =
   | { group: "gender"; key: GenderFilterKey; label: string }
@@ -42,7 +43,7 @@ const ACTIVE_COLUMNS: Array<{ key: ColumnKey; label: string }> = [
 
 const ARCHIVED_COLUMNS: Array<{ key: ColumnKey; label: string }> = [
   ...ACTIVE_COLUMNS,
-  { key: "archivedAt", label: "תאריך ארכוב" },
+  { key: "archivedAt", label: "תאריך מעבר ללא פעיל" },
 ];
 
 const FILTER_CHECKBOX_ITEMS: FilterCheckboxItem[] = [
@@ -70,7 +71,15 @@ const DEFAULT_AGE_GROUP_FILTERS: Record<AgeGroupFilterKey, boolean> = {
   UNKNOWN: true,
 };
 
-export function PatientsTable({ rows, archivedMode = false }: { rows: Row[]; archivedMode?: boolean }) {
+export function PatientsTable({
+  rows,
+  archivedMode = false,
+  displayMode = "table",
+}: {
+  rows: Row[];
+  archivedMode?: boolean;
+  displayMode?: DisplayMode;
+}) {
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [genderFilters, setGenderFilters] = useState<Record<GenderFilterKey, boolean>>(DEFAULT_GENDER_FILTERS);
@@ -210,54 +219,81 @@ export function PatientsTable({ rows, archivedMode = false }: { rows: Row[]; arc
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-black/10 text-right text-xs text-muted">
-              {columns.map((column) => renderHeader(column.key, column.label))}
-            </tr>
-          </thead>
-          <tbody>
+      {displayMode === "cards" ? (
+        filtered.length === 0 ? (
+          <div className="rounded-lg bg-black/[0.02] px-3 py-2 text-sm text-muted">אין מטופלים שתואמים לסינון.</div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-black/5 hover:bg-black/[0.02]">
-                <td className="max-w-48 p-2">
+              <Link
+                key={r.id}
+                href={`/patients/${r.id}`}
+                className="rounded-xl border border-black/12 bg-white p-3 transition hover:border-accent/35 hover:bg-accent-soft/30"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-base font-semibold text-ink">
+                    {r.firstName} {r.lastName}
+                  </div>
                   {archivedMode ? (
-                    <span className="inline-flex max-w-full items-center rounded-lg bg-black/[0.04] px-2.5 py-1 text-base font-semibold text-ink">
-                      <span className="truncate">
-                        {r.firstName} {r.lastName ? `${r.lastName.charAt(0)}.` : ""}
-                      </span>
-                    </span>
-                  ) : (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">לא פעיל</span>
+                  ) : null}
+                </div>
+                <div className="mt-2 space-y-1 text-xs text-muted">
+                  <div>טלפון: {r.phone}</div>
+                  <div>מגדר: {genderLabel(r.gender)} · גיל: {r.age ?? "—"}</div>
+                  <div>פגישה אחרונה: {formatDate(r.lastSessionAt)}</div>
+                  <div>פגישה הבאה: {formatDate(r.nextSessionAt)}</div>
+                  <div>משימות פתוחות: {r.openTasksCount} · פגישות: {r.sessionsCount}</div>
+                  {archivedMode ? <div>מעבר ללא פעיל: {formatDate(r.archivedAt)}</div> : null}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-black/10 text-right text-xs text-muted">
+                {columns.map((column) => renderHeader(column.key, column.label))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.id} className="border-b border-black/5 hover:bg-black/[0.02]">
+                  <td className="max-w-48 p-2">
                     <Link
                       href={`/patients/${r.id}`}
-                      className="inline-flex max-w-full items-center rounded-lg bg-accent-soft px-2.5 py-1 text-base font-semibold text-ink transition hover:bg-accent-soft/70"
+                      className={`inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-base font-semibold text-ink transition ${
+                        archivedMode ? "bg-black/[0.04] hover:bg-black/[0.08]" : "bg-accent-soft hover:bg-accent-soft/70"
+                      }`}
                     >
                       <span className="truncate">
                         {r.firstName} {r.lastName ? `${r.lastName.charAt(0)}.` : ""}
                       </span>
                     </Link>
-                  )}
-                </td>
-                <td className="max-w-36 p-2"><span className="block truncate">{r.phone}</span></td>
-                <td className="whitespace-nowrap p-2">{genderLabel(r.gender)}</td>
-                <td className="whitespace-nowrap p-2">{r.age ?? "—"}</td>
-                <td className="whitespace-nowrap p-2">{formatDate(r.lastSessionAt)}</td>
-                <td className="whitespace-nowrap p-2">{formatDate(r.nextSessionAt)}</td>
-                <td className="whitespace-nowrap p-2">{r.openTasksCount}</td>
-                <td className="p-2">{r.sessionsCount}</td>
-                {archivedMode ? <td className="whitespace-nowrap p-2">{formatDate(r.archivedAt)}</td> : null}
-              </tr>
-            ))}
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="p-4 text-center text-sm text-muted">
-                  אין מטופלים שתואמים לפילטרים.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+                  </td>
+                  <td className="max-w-36 p-2"><span className="block truncate">{r.phone}</span></td>
+                  <td className="whitespace-nowrap p-2">{genderLabel(r.gender)}</td>
+                  <td className="whitespace-nowrap p-2">{r.age ?? "—"}</td>
+                  <td className="whitespace-nowrap p-2">{formatDate(r.lastSessionAt)}</td>
+                  <td className="whitespace-nowrap p-2">{formatDate(r.nextSessionAt)}</td>
+                  <td className="whitespace-nowrap p-2">{r.openTasksCount}</td>
+                  <td className="p-2">{r.sessionsCount}</td>
+                  {archivedMode ? <td className="whitespace-nowrap p-2">{formatDate(r.archivedAt)}</td> : null}
+                </tr>
+              ))}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className="p-4 text-center text-sm text-muted">
+                    אין מטופלים שתואמים לסינון.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuickActions } from "@/components/QuickActions";
 
@@ -31,13 +31,14 @@ type SettingsState = {
 type SettingsProfile = {
   therapistName?: string;
   email?: string;
+  defaultFee?: number;
 };
 
-const STORAGE_KEY = "tabula.settings.v1";
+const STORAGE_KEY_PREFIX = "tabula.settings.v1";
 
 const DEFAULT_SETTINGS: SettingsState = {
-  therapistName: "יונתן",
-  email: "therapist@example.com",
+  therapistName: "",
+  email: "",
   phone: "050-0000000",
   clinicAddress: "תל אביב",
   sessionMinutes: 50,
@@ -61,11 +62,15 @@ const DEFAULT_SETTINGS: SettingsState = {
 
 export function SettingsEditor({ initialProfile, canManageInvites = false }: { initialProfile?: SettingsProfile; canManageInvites?: boolean }) {
   const { showToast } = useQuickActions();
+  const storageKey = useMemo(
+    () => buildStorageKey(initialProfile?.email),
+    [initialProfile?.email],
+  );
   const [settings, setSettings] = useState<SettingsState>(() => buildDefaultSettings(initialProfile));
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const raw = window.localStorage.getItem(storageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<SettingsState>;
       const timer = window.setTimeout(() => {
@@ -89,10 +94,10 @@ export function SettingsEditor({ initialProfile, canManageInvites = false }: { i
     } catch {
       return;
     }
-  }, [initialProfile]);
+  }, [initialProfile, storageKey]);
 
   function save() {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    window.localStorage.setItem(storageKey, JSON.stringify(settings));
     showToast({ message: "ההגדרות נשמרו" });
   }
 
@@ -177,9 +182,18 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 function buildDefaultSettings(initialProfile?: SettingsProfile): SettingsState {
   const therapistName = initialProfile?.therapistName?.trim();
   const email = initialProfile?.email?.trim().toLowerCase();
+  const defaultFee = typeof initialProfile?.defaultFee === "number" && initialProfile.defaultFee > 0
+    ? Math.trunc(initialProfile.defaultFee)
+    : DEFAULT_SETTINGS.defaultFee;
   return {
     ...DEFAULT_SETTINGS,
     therapistName: therapistName || DEFAULT_SETTINGS.therapistName,
     email: email || DEFAULT_SETTINGS.email,
+    defaultFee,
   };
+}
+
+function buildStorageKey(email: string | undefined) {
+  const normalized = String(email ?? "").trim().toLowerCase();
+  return normalized ? `${STORAGE_KEY_PREFIX}:${normalized}` : STORAGE_KEY_PREFIX;
 }

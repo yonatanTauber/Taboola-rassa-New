@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useQuickActions } from "@/components/QuickActions";
+import { PatientStatusDialog } from "@/components/patients/PatientStatusDialog";
 
 type FormState = {
   firstName: string;
@@ -26,6 +26,7 @@ export function PatientProfileEditor({
   collapsible = false,
   initiallyCollapsed = false,
   showAvatarField = true,
+  isInactive = false,
 }: {
   patientId: string;
   initial: FormState;
@@ -34,13 +35,14 @@ export function PatientProfileEditor({
   collapsible?: boolean;
   initiallyCollapsed?: boolean;
   showAvatarField?: boolean;
+  isInactive?: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useQuickActions();
   const [editing, setEditing] = useState(startEditing);
   const [saving, setSaving] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(collapsible ? initiallyCollapsed && !startEditing : false);
   const [form, setForm] = useState<FormState>(initial);
 
@@ -65,20 +67,6 @@ export function PatientProfileEditor({
 
     setEditing(false);
     showToast({ message: "פרטי המטופל נשמרו בהצלחה" });
-    router.refresh();
-  }
-
-  async function archivePatient() {
-    setArchiving(true);
-    const res = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
-    setArchiving(false);
-    if (!res.ok) {
-      showToast({ message: "העברה לארכיון נכשלה." });
-      return;
-    }
-    showToast({ message: "המטופל הועבר לארכיון" });
-    setArchiveOpen(false);
-    router.push("/patients");
     router.refresh();
   }
 
@@ -121,10 +109,10 @@ export function PatientProfileEditor({
           {showArchive ? (
             <button
               type="button"
-              onClick={() => setArchiveOpen(true)}
+              onClick={() => setStatusOpen(true)}
               className="app-btn app-btn-secondary text-muted hover:bg-black/[0.03]"
             >
-              ארכיון
+              {isInactive ? "השב לפעיל" : "לא פעיל"}
             </button>
           ) : null}
         </div>
@@ -235,16 +223,45 @@ export function PatientProfileEditor({
       </div>
       ) : null}
 
-      <ConfirmDialog
-        open={archiveOpen}
-        title="להעביר מטופל לארכיון?"
-        message="ניתן לצפות בו אחר כך דרך דף מטופלי הארכיון."
-        confirmLabel="העבר לארכיון"
-        cancelLabel="ביטול"
-        busy={archiving}
-        onCancel={() => setArchiveOpen(false)}
-        onConfirm={() => {
-          void archivePatient();
+      <PatientStatusDialog
+        open={statusOpen}
+        mode={isInactive ? "reactivate" : "setInactive"}
+        busy={statusBusy}
+        onCancel={() => setStatusOpen(false)}
+        onSubmit={async (payload) => {
+          setStatusBusy(true);
+          const action = isInactive ? "reactivate" : "set_inactive";
+          const body = isInactive
+            ? {
+                action,
+                reactivatedAt: payload.date,
+                reason: payload.reason,
+              }
+            : {
+                action,
+                inactiveAt: payload.date,
+                reason: payload.reason || null,
+                cancelFutureSessions: payload.cancelFutureSessions,
+                closeOpenTasks: payload.closeOpenTasks,
+              };
+          const res = await fetch(`/api/patients/${patientId}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const responsePayload = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setStatusBusy(false);
+
+          if (!res.ok) {
+            showToast({ message: responsePayload.error ?? "עדכון סטטוס המטופל נכשל." });
+            return;
+          }
+
+          showToast({ message: isInactive ? "המטופל הושב למצב פעיל" : "המטופל הועבר למצב לא פעיל" });
+          setStatusOpen(false);
+          router.refresh();
         }}
       />
     </section>

@@ -47,6 +47,7 @@ export default async function TasksPage({
         dueAt: task.dueAt?.toISOString(),
         patientId: task.patientId ?? undefined,
         patientName: task.patient ? formatPatientName(task.patient.firstName, task.patient.lastName) : undefined,
+        patientInactive: task.patient ? Boolean(task.patient.archivedAt) : false,
         sessionId: task.sessionId ?? undefined,
       }))}
       patients={patients.map((p) => ({ id: p.id, name: formatPatientName(p.firstName, p.lastName) }))}

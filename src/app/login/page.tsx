@@ -2,11 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AppLogo } from "@/components/AppLogo";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,7 +26,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    router.replace("/");
+    window.location.assign("/");
   }
 
   return (

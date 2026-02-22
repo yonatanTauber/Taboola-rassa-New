@@ -46,6 +46,7 @@ export function PatientAdditionalGrid({
   patientId,
   startEditingProfile,
   profileInitial,
+  isInactive = false,
   goals,
   referralReason,
   previousTherapy,
@@ -60,6 +61,7 @@ export function PatientAdditionalGrid({
   patientId: string;
   startEditingProfile: boolean;
   profileInitial: ProfileInitial;
+  isInactive?: boolean;
   goals: string | null;
   referralReason: string | null;
   previousTherapy: string | null;
@@ -192,6 +194,7 @@ export function PatientAdditionalGrid({
           initiallyCollapsed={!startEditingProfile}
           showAvatarField={false}
           initial={profileInitial}
+          isInactive={isInactive}
         />
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
