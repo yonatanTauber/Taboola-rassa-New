@@ -15,13 +15,27 @@ type SessionPayload = {
   note: string;
 };
 
+// Convert a UTC ISO datetime string (from the server) to local time parts.
+// The server always sends UTC (e.g. "2026-02-19T14:00"), appending "Z" makes
+// the browser parse it correctly as UTC before converting to local.
+function utcToLocalDateTimeStr(utcStr: string) {
+  const d = new Date(utcStr + "Z");
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
 export function SessionEditor({ session }: { session: SessionPayload }) {
   const router = useRouter();
   const { showToast } = useQuickActions();
   const [form, setForm] = useState(session);
-  const [datePart, setDatePart] = useState(session.scheduledAt.slice(0, 10));
-  const [hourPart, setHourPart] = useState(session.scheduledAt.slice(11, 13));
-  const [minutePart, setMinutePart] = useState(session.scheduledAt.slice(14, 16));
+  const localDT = utcToLocalDateTimeStr(session.scheduledAt);
+  const [datePart, setDatePart] = useState(localDT.slice(0, 10));
+  const [hourPart, setHourPart] = useState(localDT.slice(11, 13));
+  const [minutePart, setMinutePart] = useState(localDT.slice(14, 16));
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -29,12 +43,19 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const [undocumentedConfirmOpen, setUndocumentedConfirmOpen] = useState(false);
 
   async function save(allowUndocumented = false) {
-    const scheduled = new Date(`${datePart}T${hourPart}:${minutePart}`);
+    // Build as local time in browser → correct UTC conversion via toISOString()
+    const localStr = `${datePart}T${hourPart}:${minutePart}`;
+    const scheduled = new Date(localStr); // browser interprets as local time
+    const scheduledAtUTC = scheduled.toISOString(); // → UTC for the server
     const isPastSession = scheduled.getTime() <= Date.now();
     const hasNote = form.note.trim().length > 0;
+    const hasSubstantialNote = form.note.trim().length > 10;
     let nextStatus = form.status;
 
-    if (isPastSession && form.status === "SCHEDULED") {
+    if (hasSubstantialNote && form.status === "SCHEDULED") {
+      // "אשר" button clicked — always mark as completed
+      nextStatus = "COMPLETED";
+    } else if (isPastSession && form.status === "SCHEDULED") {
       if (hasNote) {
         nextStatus = "COMPLETED";
       } else {
@@ -52,7 +73,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       body: JSON.stringify({
         ...form,
         status: nextStatus,
-        scheduledAt: `${datePart}T${hourPart}:${minutePart}`,
+        scheduledAt: scheduledAtUTC,
         feeNis: form.feeNis === "" ? "" : Number(form.feeNis),
       }),
     });
@@ -79,7 +100,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
             status: payload.previous.status,
             location: payload.previous.location ?? "",
             feeNis: payload.previous.feeNis ?? "",
-            scheduledAt: toDateTimeInput(new Date(payload.previous.scheduledAt)),
+            scheduledAt: new Date(payload.previous.scheduledAt).toISOString(),
             note: payload.previous.sessionNote?.markdown ?? "",
           }),
         });
@@ -184,7 +205,9 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => router.back()} className="app-btn app-btn-secondary">ביטול</button>
-          <button onClick={() => void save()} className="app-btn app-btn-primary">עדכן</button>
+          <button onClick={() => void save()} className="app-btn app-btn-primary">
+            {form.note.trim().length > 10 ? "אשר" : "עדכן"}
+          </button>
         </div>
       </div>
 
@@ -224,6 +247,3 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   );
 }
 
-function toDateTimeInput(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-}

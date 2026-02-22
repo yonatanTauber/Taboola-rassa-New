@@ -144,5 +144,6 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
 }
 
 function toDateTimeInput(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  // Return raw UTC ISO string — SessionEditor (client) will convert to local time
+  return date.toISOString().slice(0, 16);
 }
