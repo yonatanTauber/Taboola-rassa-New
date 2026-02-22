@@ -4,6 +4,7 @@ import { QuickActionButton } from "@/components/QuickActionButton";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { markUndocumentedSessions } from "@/lib/maintenance";
 import { formatPatientName } from "@/lib/patient-name";
+import { fmtTime, fmtDateShort } from "@/lib/format-date";
 import { prisma } from "@/lib/prisma";
 
 export default async function SessionsPage({
@@ -104,9 +105,9 @@ export default async function SessionsPage({
                 <li key={`session-${item.key}`}>
                   <Link href={`/sessions/${item.session.id}`} className="grid grid-cols-[90px_1fr_auto] items-center gap-3 rounded-xl border border-black/10 px-3 py-2 hover:bg-black/[0.02]">
                     <div className="font-mono tabular-nums text-sm text-muted">
-                      {item.session.scheduledAt.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}
+                      {fmtDateShort(item.session.scheduledAt)}
                       <br />
-                      {item.session.scheduledAt.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                      {fmtTime(item.session.scheduledAt)}
                     </div>
                     <div>
                       <p className="font-medium text-ink">{formatPatientName(item.session.patient.firstName, item.session.patient.lastName)}</p>
@@ -124,9 +125,9 @@ export default async function SessionsPage({
                 <li key={`guidance-${item.key}`}>
                   <Link href={`/guidance/${item.guidance.id}`} className="grid grid-cols-[90px_1fr_auto] items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2 hover:bg-blue-50">
                     <div className="font-mono tabular-nums text-sm text-muted">
-                      {item.scheduledAt.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}
+                      {fmtDateShort(item.scheduledAt)}
                       <br />
-                      {item.scheduledAt.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                      {fmtTime(item.scheduledAt)}
                     </div>
                     <div>
                       <p className="font-medium text-ink">

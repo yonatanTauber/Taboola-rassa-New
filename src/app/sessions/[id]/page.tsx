@@ -5,6 +5,7 @@ import { SessionReceiptsPager } from "@/components/SessionReceiptsPager";
 import { SessionEditor } from "@/components/SessionEditor";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { formatPatientName } from "@/lib/patient-name";
+import { fmtDate } from "@/lib/format-date";
 import { prisma } from "@/lib/prisma";
 
 export default async function SessionDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -62,7 +63,7 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
             id={session.patient.id}
             label={formatPatientName(session.patient.firstName, session.patient.lastName)}
           />
-          <div className="mt-2 text-muted">פגישה בתאריך {session.scheduledAt.toLocaleDateString("he-IL")}</div>
+          <div className="mt-2 text-muted">פגישה בתאריך {fmtDate(session.scheduledAt)}</div>
         </section>
       </section>
 

@@ -5,10 +5,13 @@ import { PatientArchiveMenu } from "@/components/patients/PatientArchiveMenu";
 import { PatientAdditionalGrid } from "@/components/patients/PatientAdditionalGrid";
 import { PatientAvatarPicker } from "@/components/patients/PatientAvatarPicker";
 import { PatientConnectionsGraph } from "@/components/patients/PatientConnectionsGraph";
+import { PatientLifecycleTimeline } from "@/components/patients/PatientLifecycleTimeline";
+import { PatientReactivationBanner } from "@/components/patients/PatientReactivationBanner";
 import { PatientSessionsPanel } from "@/components/patients/PatientSessionsPanel";
 import { PatientTasksPanel } from "@/components/patients/PatientTasksPanel";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { buildPatientConnectionsGraphData } from "@/lib/patient-connections";
+import { fmtTime, fmtDate } from "@/lib/format-date";
 import { prisma } from "@/lib/prisma";
 import { ResearchTargetType } from "@prisma/client";
 
@@ -25,7 +28,7 @@ export default async function PatientDetailsPage({
   const query = await searchParams;
 
   const patient = await prisma.patient.findFirst({
-    where: { id, archivedAt: null, ownerUserId: userId },
+    where: { id, ownerUserId: userId },
     include: {
       intakes: { orderBy: { createdAt: "desc" }, take: 1 },
       sessions: {
@@ -46,6 +49,7 @@ export default async function PatientDetailsPage({
       patientNotes: { orderBy: { createdAt: "desc" }, take: 50 },
       conceptLinks: { orderBy: { createdAt: "desc" }, take: 50 },
       figures: { orderBy: { createdAt: "desc" }, take: 100 },
+      ownerUser: { select: { fullName: true } },
       guidances: {
         orderBy: [{ updatedAt: "desc" }],
         take: 50,
@@ -62,6 +66,13 @@ export default async function PatientDetailsPage({
               },
             },
           },
+        },
+      },
+      lifecycleEvents: {
+        orderBy: [{ occurredAt: "desc" }],
+        take: 120,
+        include: {
+          actorUser: { select: { fullName: true } },
         },
       },
     },
@@ -140,6 +151,7 @@ export default async function PatientDetailsPage({
   if (!patient) return notFound();
 
   const latestIntake = patient.intakes[0];
+  const isInactive = Boolean(patient.archivedAt);
   const debtRows = patient.sessions
     .map((session) => {
       const fee = session.feeNis ?? 0;
@@ -156,6 +168,40 @@ export default async function PatientDetailsPage({
   const treatmentMonths = calcTreatmentMonths(treatmentStart);
   const now = new Date();
   const nextSession = resolveNextSession(patient.fixedSessionDay, patient.fixedSessionTime, patient.sessions);
+  const inferredDefaultFee = inferDefaultFeeFromSessions(patient.sessions);
+  const lifecycleEvents = [
+    {
+      id: `created-${patient.id}`,
+      eventType: "PATIENT_CREATED" as const,
+      occurredAt: (patient.treatmentStartDate ?? patient.createdAt).toISOString(),
+      reason: "פתיחת תיק מטופל",
+      actorName: patient.ownerUser?.fullName ?? null,
+      metadata: null,
+    },
+    ...patient.lifecycleEvents.map((event) => ({
+      id: event.id,
+      eventType: event.eventType,
+      occurredAt: event.occurredAt.toISOString(),
+      reason: event.reason,
+      actorName: event.actorUser?.fullName ?? null,
+      metadata:
+        event.metadataJson && typeof event.metadataJson === "object" && !Array.isArray(event.metadataJson)
+          ? {
+              canceledSessionsCount:
+                typeof (event.metadataJson as Record<string, unknown>).canceledSessionsCount === "number"
+                  ? Number((event.metadataJson as Record<string, unknown>).canceledSessionsCount)
+                  : undefined,
+              closedTasksCount:
+                typeof (event.metadataJson as Record<string, unknown>).closedTasksCount === "number"
+                  ? Number((event.metadataJson as Record<string, unknown>).closedTasksCount)
+                  : undefined,
+            }
+          : null,
+    })),
+  ]
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    .slice(0, 120);
+
   const graphData = buildPatientConnectionsGraphData({
     patient: {
       id: patient.id,
@@ -225,7 +271,14 @@ export default async function PatientDetailsPage({
           <div className="flex items-start gap-4">
             <PatientAvatarPicker patientId={patient.id} value={patient.avatarKey ?? ""} />
             <div>
-              <h1 className="text-3xl font-semibold text-ink">{`${patient.firstName} ${patient.lastName}`}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-semibold text-ink">{`${patient.firstName} ${patient.lastName}`}</h1>
+                <span
+                  className={`rounded-full px-2 py-1 text-xs ${isInactive ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}
+                >
+                  {isInactive ? "לא פעיל" : "פעיל"}
+                </span>
+              </div>
               <p className="mt-1 text-sm text-muted">{patient.phone} · {patient.email ?? "ללא אימייל"}</p>
             </div>
           </div>
@@ -234,9 +287,12 @@ export default async function PatientDetailsPage({
             editPatientHref={`/patients/${patient.id}?edit=patient#patient-profile`}
             editLayoutHref={`/patients/${patient.id}#patient-layout`}
             intakeHref={`/patients/${patient.id}/intake`}
+            isInactive={isInactive}
           />
         </div>
       </section>
+
+      {isInactive ? <PatientReactivationBanner patientId={patient.id} /> : null}
 
       <section className="grid gap-3 md:grid-cols-4">
         <InfoCard
@@ -246,8 +302,8 @@ export default async function PatientDetailsPage({
         />
         <InfoCard
           label="פגישה הבאה"
-          value={nextSession ? nextSession.toLocaleDateString("he-IL") : "אין פגישה מתוכננת"}
-          sub={nextSession ? nextSession.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : fixedSessionLabel(patient.fixedSessionDay, patient.fixedSessionTime)}
+          value={nextSession ? fmtDate(nextSession) : "אין פגישה מתוכננת"}
+          sub={nextSession ? fmtTime(nextSession) : fixedSessionLabel(patient.fixedSessionDay, patient.fixedSessionTime)}
         />
         <InfoCard label="משך הטיפול" value={formatTreatmentDuration(treatmentMonths)} sub={`מתאריך ${treatmentStart.toLocaleDateString("he-IL")}`} />
         <InfoCard
@@ -256,9 +312,13 @@ export default async function PatientDetailsPage({
           sub={`${debtRows.length} פגישות לא שולמו`}
           tone={totalDebt > 0 ? "warn" : "normal"}
           action={
-            <Link href={`/receipts/new?patientId=${patient.id}`} className="app-btn app-btn-primary mt-2 text-xs">
-              הפקת קבלה
-            </Link>
+            isInactive ? (
+              <span className="mt-2 inline-flex rounded-md bg-black/[0.04] px-2 py-1 text-xs text-muted">לא ניתן להפיק קבלה למטופל לא פעיל</span>
+            ) : (
+              <Link href={`/receipts/new?patientId=${patient.id}`} className="app-btn app-btn-primary mt-2 text-xs">
+                הפקת קבלה
+              </Link>
+            )
           }
         />
       </section>
@@ -268,6 +328,7 @@ export default async function PatientDetailsPage({
           <PatientSessionsPanel
             patientId={patient.id}
             nowIso={now.toISOString()}
+            patientInactive={isInactive}
             rows={patient.sessions.map((session) => {
               const fee = session.feeNis ?? 0;
               const paid = session.paymentAllocations.reduce((acc, item) => acc + item.amountNis, 0);
@@ -288,6 +349,7 @@ export default async function PatientDetailsPage({
 
           <PatientTasksPanel
             patientId={patient.id}
+            patientInactive={isInactive}
             tasks={patient.tasks.map((task) => ({
               id: task.id,
               title: task.title,
@@ -308,6 +370,7 @@ export default async function PatientDetailsPage({
         <PatientAdditionalGrid
           patientId={patient.id}
           startEditingProfile={query.edit === "patient"}
+          isInactive={isInactive}
           profileInitial={{
             firstName: patient.firstName,
             lastName: patient.lastName,
@@ -320,7 +383,11 @@ export default async function PatientDetailsPage({
                 ? String(patient.fixedSessionDay)
                 : "",
             fixedSessionTime: patient.fixedSessionTime ?? "",
-            defaultSessionFeeNis: patient.defaultSessionFeeNis ? String(patient.defaultSessionFeeNis) : "",
+            defaultSessionFeeNis: patient.defaultSessionFeeNis
+              ? String(patient.defaultSessionFeeNis)
+              : inferredDefaultFee
+                ? String(inferredDefaultFee)
+                : "",
             avatarKey: patient.avatarKey ?? "",
           }}
           goals={latestIntake?.goals ?? null}
@@ -349,6 +416,14 @@ export default async function PatientDetailsPage({
         />
       </section>
 
+      <PatientLifecycleTimeline
+        events={lifecycleEvents}
+        sessions={patient.sessions.map((session) => ({
+          id: session.id,
+          scheduledAt: session.scheduledAt.toISOString(),
+          status: session.status,
+        }))}
+      />
     </main>
   );
 }
@@ -399,19 +474,60 @@ function fixedSessionLabel(day: number | null, time: string | null) {
 function resolveNextSession(day: number | null, time: string | null, sessions: Array<{ scheduledAt: Date; status: string }>) {
   const now = new Date();
   const future = sessions
-    .filter((s) => s.scheduledAt.getTime() > now.getTime() && s.status !== "CANCELED")
+    .filter((s) => s.scheduledAt.getTime() > now.getTime() && s.status !== "CANCELED" && s.status !== "CANCELED_LATE")
     .sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())[0];
   if (future) return future.scheduledAt;
 
   if (day === null || day === undefined || !time) return null;
   const [h, m] = time.split(":").map((v) => Number(v));
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  const candidate = new Date(now);
-  candidate.setHours(h, m, 0, 0);
-  const delta = (day - candidate.getDay() + 7) % 7;
-  candidate.setDate(candidate.getDate() + delta);
-  if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 7);
-  return candidate;
+
+  // All Date arithmetic must account for Israel timezone (UTC+2 / UTC+3 DST).
+  // On Vercel (UTC), getDay()/setHours() would operate in UTC — wrong.
+  // Instead: use Intl to extract Israel wall-clock date parts, then build a
+  // UTC timestamp by parsing "YYYY-MM-DDThh:mm" as an Israel local time via
+  // a known-offset string (Intl gives us the exact UTC offset).
+  const TZ = "Asia/Jerusalem";
+
+  // Get Israel wall-clock parts for "now"
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(now);
+  const p = (type: string) => parts.find((x) => x.type === type)?.value ?? "0";
+  const ilYear = Number(p("year"));
+  const ilMonth = Number(p("month")); // 1-based
+  const ilDay = Number(p("day"));
+  const ilHour = Number(p("hour")) % 24; // "24" → 0 on some engines
+  const ilMinute = Number(p("minute"));
+
+  // Day-of-week in Israel (0=Sun … 6=Sat)
+  const ilDow = new Date(now).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" });
+  const DOW: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const ilTodayDow = DOW[ilDow] ?? 0;
+
+  // Compute Israel UTC offset at "now" (in minutes, positive = ahead of UTC)
+  // by comparing UTC interpretation of an IL-date-string vs actual UTC
+  const ilDateStr = `${ilYear}-${String(ilMonth).padStart(2, "0")}-${String(ilDay).padStart(2, "0")}`;
+  const utcMidnightMs = Date.UTC(ilYear, ilMonth - 1, ilDay); // midnight UTC of IL calendar date
+  // IL midnight as UTC: parse "YYYY-MM-DDT00:00:00Z" vs the actual UTC at IL midnight
+  // Easier: offset = UTC timestamp when IL shows hh:mm minus UTC timestamp of same hh:mm read as UTC
+  const ilNowAsIfUTC = Date.UTC(ilYear, ilMonth - 1, ilDay, ilHour, ilMinute);
+  const ilOffsetMs = ilNowAsIfUTC - now.getTime(); // positive → IL ahead of UTC (e.g. 7200000 for UTC+2)
+
+  // Build "today in IL at h:m" as a UTC timestamp
+  const todayAtTimeMs = Date.UTC(ilYear, ilMonth - 1, ilDay, h, m) - ilOffsetMs;
+  const todayAtTime = new Date(todayAtTimeMs);
+
+  // How many days until the target weekday?
+  let delta = (day - ilTodayDow + 7) % 7;
+  // If same weekday but the time has already passed today, go to next week
+  if (delta === 0 && todayAtTime.getTime() <= now.getTime()) delta = 7;
+
+  return new Date(todayAtTime.getTime() + delta * 86400000);
 }
 
 function statusLabel(status: string) {
@@ -430,5 +546,25 @@ function statusTone(status: string) {
 }
 
 function toDateInput(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  // Use Israel timezone so the date shown in the input matches the local calendar date,
+  // not the UTC date (which can differ by a day for times stored near midnight).
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" }); // "YYYY-MM-DD"
+}
+
+function inferDefaultFeeFromSessions(sessions: Array<{ feeNis: number | null }>) {
+  const counts = new Map<number, number>();
+  for (const session of sessions) {
+    const fee = session.feeNis ?? 0;
+    if (fee <= 0) continue;
+    counts.set(fee, (counts.get(fee) ?? 0) + 1);
+  }
+  let bestFee: number | null = null;
+  let bestCount = 0;
+  for (const [fee, count] of counts) {
+    if (count > bestCount) {
+      bestFee = fee;
+      bestCount = count;
+    }
+  }
+  return bestFee;
 }

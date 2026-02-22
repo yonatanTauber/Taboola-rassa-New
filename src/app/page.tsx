@@ -4,13 +4,15 @@ import { CalendarSwitcher } from "@/components/CalendarSwitcher";
 import { PatientQuickJump } from "@/components/PatientQuickJump";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { TaskChecklist } from "@/components/TaskChecklist";
+import { getCurrentUser } from "@/lib/auth-server";
 import { markUndocumentedSessions } from "@/lib/maintenance";
 import { formatPatientName } from "@/lib/patient-name";
+import { fmtTime } from "@/lib/format-date";
 import { prisma } from "@/lib/prisma";
-import { requireCurrentUserId } from "@/lib/auth-server";
 
 export default async function Home() {
-  const userId = await requireCurrentUserId();
+  const currentUser = await getCurrentUser();
+  const userId = currentUser?.id ?? null;
   if (!userId) return null;
   await markUndocumentedSessions(userId);
 
@@ -154,6 +156,7 @@ export default async function Home() {
     }));
 
   const greeting = getGreeting();
+  const displayName = firstNameFromFullName(currentUser?.fullName);
 
   return (
     <main className="flex flex-col gap-3">
@@ -161,7 +164,9 @@ export default async function Home() {
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
           <div className="order-1 space-y-3 lg:order-1">
             <p className="text-sm text-muted">{new Date().toLocaleDateString("he-IL")} · מרכז קליניקה</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-ink">{greeting}, יונתן</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-ink">
+              {displayName ? `${greeting}, ${displayName}` : greeting}
+            </h1>
             <p className="text-sm text-muted">תצפית יומית על פגישות, משימות, הכנסות ותיעוד.</p>
             <div className="pt-2">
               <div className="text-sm text-muted">מעבר מהיר למטופל</div>
@@ -201,7 +206,7 @@ export default async function Home() {
                 {todaySessions.map((session) => (
                   <li key={session.id}>
                     <Link href={`/sessions/${session.id}`} className="grid grid-cols-[90px_1fr_auto] items-center gap-3 rounded-xl border border-black/8 bg-white px-3 py-2 hover:bg-black/[0.02]">
-                      <div className="font-mono tabular-nums text-sm text-muted">{session.scheduledAt.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</div>
+                      <div className="font-mono tabular-nums text-sm text-muted">{fmtTime(session.scheduledAt)}</div>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-ink">{formatPatientName(session.patient.firstName, session.patient.lastName)}</div>
                         <div className={`text-xs ${billingTone(session.feeNis ?? 0, session.paymentAllocations.reduce((sum, p) => sum + p.amountNis, 0))}`}>
@@ -268,6 +273,12 @@ function getGreeting() {
   if (hour < 12) return "בוקר טוב";
   if (hour < 18) return "צהריים טובים";
   return "ערב טוב";
+}
+
+function firstNameFromFullName(fullName: string | null | undefined) {
+  const cleaned = String(fullName ?? "").trim();
+  if (!cleaned) return "";
+  return cleaned.split(/\s+/)[0] ?? cleaned;
 }
 
 function getDayRange() {
