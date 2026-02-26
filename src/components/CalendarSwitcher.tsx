@@ -6,8 +6,16 @@ import { useRouter } from "next/navigation";
 import { TaskChecklist } from "@/components/TaskChecklist";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, useDraggable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { useQuickActions } from "@/components/QuickActions";
 
 const HEB_DAYS_LONG = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+// Hourly grid constants
+const HOUR_H = 56; // px per hour
+const START_HOUR = 8;
+const END_HOUR = 21;
+const HOUR_RANGE = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+const GRID_H = HOUR_RANGE.length * HOUR_H;
 
 export type CalendarSession = {
   id: string;
@@ -191,7 +199,6 @@ export function CalendarSwitcher({
         setToast({ message: "שגיאה בעדכון התאריך" });
       } else {
         const snapshot = [...sessions];
-        // Refresh server components (e.g. "פגישות היום" block on dashboard)
         router.refresh();
         setToast({
           message: "תאריך עודכן",
@@ -272,9 +279,7 @@ export function CalendarSwitcher({
       {/* Header: title + nav arrows + mode switcher */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">יומן</h2>
-        {/* Navigation controls – sit beside the mode buttons */}
         <div className="flex items-center gap-1 mr-auto">
-          {/* RTL layout: ‹ = previous (go right/back), › = next (go left/forward) */}
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -361,10 +366,20 @@ export function CalendarSwitcher({
   );
 }
 
-function DroppableDay({ dateKey, children, className }: { dateKey: string; children: React.ReactNode; className: string }) {
+function DroppableDay({
+  dateKey,
+  children,
+  className,
+  style,
+}: {
+  dateKey: string;
+  children: React.ReactNode;
+  className: string;
+  style?: React.CSSProperties;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${dateKey}` });
   return (
-    <div ref={setNodeRef} className={`${className} ${isOver ? "ring-2 ring-accent ring-inset" : ""}`}>
+    <div ref={setNodeRef} style={style} className={`${className} ${isOver ? "ring-2 ring-accent ring-inset" : ""}`}>
       {children}
     </div>
   );
@@ -376,15 +391,15 @@ function DraggableSession({ session }: { session: CalendarSession }) {
   const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none h-full">
       <Link
         href={session.href}
-        className={`block rounded-lg px-1.5 py-1 text-[10px] text-ink hover:brightness-[0.98] cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+        className={`block h-full overflow-hidden rounded-md px-1 py-0.5 text-[9px] text-ink hover:brightness-[0.97] cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
         draggable={false}
       >
-        <div className="font-mono tabular-nums">{timeRangeLabel(new Date(session.startIso))}</div>
-        {session.title && <div className="truncate text-[9px] text-muted">{session.title}</div>}
-        <div className="truncate">{session.patient}</div>
+        <div className="font-mono tabular-nums leading-tight">{timeRangeLabel(new Date(session.startIso))}</div>
+        {session.title && <div className="truncate text-[8px] text-muted leading-tight">{session.title}</div>}
+        <div className="truncate leading-tight">{session.patient}</div>
       </Link>
     </div>
   );
@@ -438,6 +453,9 @@ function WeekBoard({
   today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
 }) {
+  const { openAction } = useQuickActions();
+  const [slotPicker, setSlotPicker] = useState<{ date: Date; hour: number } | null>(null);
+
   const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }).map((_, idx) => {
     const d = new Date(start);
@@ -447,53 +465,148 @@ function WeekBoard({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
-        {days.map((day) => {
-          const dateKey = toDateKey(day);
-          const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), day));
-          const daySessions = sessions
-            .filter((s) => sameDay(new Date(s.startIso), day))
-            .sort((a, b) => +new Date(a.startIso) - +new Date(b.startIso));
-          const isToday = sameDay(day, today);
-
-          return (
-            <DroppableDay
-              key={dateKey}
-              dateKey={dateKey}
-              className={`min-h-72 rounded-xl border p-2 transition-colors ${isToday ? "border-accent bg-accent-soft/20" : "border-black/12"}`}
-            >
-              <div className={`mb-2 text-[11px] font-medium ${isToday ? "text-accent" : "text-muted"}`}>
-                {`יום ${HEB_DAYS_LONG[day.getDay()]} ${day.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}`}
+      <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "70vh" }}>
+        <div dir="ltr" className="flex min-w-[600px]">
+          {/* Time axis */}
+          <div className="w-11 flex-shrink-0 border-e border-black/8 bg-white">
+            <div className="h-8 border-b border-black/8" />
+            {HOUR_RANGE.map((h) => (
+              <div key={h} style={{ height: HOUR_H }} className="relative border-t border-black/[0.06]">
+                <span className="absolute -top-[9px] end-1.5 select-none text-[9px] tabular-nums text-muted">
+                  {String(h).padStart(2, "0")}:00
+                </span>
               </div>
+            ))}
+          </div>
 
-              <div className="mb-2 rounded-lg bg-app-bg p-1.5">
-                <div className="mb-1 text-[10px] font-medium text-muted">משימות</div>
-                {dayTasks.length ? (
-                  <div className="space-y-1">
-                    {dayTasks.map((t) => (
-                      <DraggableTask
-                        key={t.id}
-                        task={t}
-                        onOpen={() => onOpenDayTasks({ dateLabel: day.toLocaleDateString("he-IL"), tasks: dayTasks })}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-muted">—</div>
-                )}
-              </div>
+          {/* Day columns */}
+          {days.map((day) => {
+            const dateKey = toDateKey(day);
+            const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), day));
+            const daySessions = sessions
+              .filter((s) => sameDay(new Date(s.startIso), day))
+              .sort((a, b) => +new Date(a.startIso) - +new Date(b.startIso));
+            const isToday = sameDay(day, today);
 
-              <div className="space-y-1">
-                {daySessions.length ? (
-                  daySessions.map((s) => <DraggableSession key={s.id} session={s} />)
-                ) : (
-                  <div className="text-[10px] text-muted">אין פגישות</div>
-                )}
+            return (
+              <div key={dateKey} className="relative min-w-[72px] flex-1 border-s border-black/8 first:border-s-0">
+                {/* Day header */}
+                <div className={`sticky top-0 z-20 flex h-8 items-center justify-center gap-1 border-b border-black/8 px-1 text-center text-[10px] ${isToday ? "bg-accent-soft font-semibold text-accent" : "bg-white text-muted"}`}>
+                  <span>{`יום ${HEB_DAYS_LONG[day.getDay()]}`}</span>
+                  <span className={`inline-flex size-4 items-center justify-center rounded-full text-[10px] ${isToday ? "bg-accent text-white" : ""}`}>
+                    {day.getDate()}
+                  </span>
+                  {dayTasks.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenDayTasks({ dateLabel: day.toLocaleDateString("he-IL"), tasks: dayTasks })}
+                      className="ms-0.5 rounded-full bg-amber-100 px-1 text-[9px] text-amber-700 hover:bg-amber-200"
+                    >
+                      {dayTasks.length}✓
+                    </button>
+                  )}
+                </div>
+
+                {/* Drop zone = the hourly grid */}
+                <DroppableDay dateKey={dateKey} className="relative" style={{ height: GRID_H }}>
+                  {/* Clickable hour slots */}
+                  {HOUR_RANGE.map((h, i) => (
+                    <div
+                      key={h}
+                      onClick={() => setSlotPicker({ date: day, hour: h })}
+                      style={{ top: i * HOUR_H, height: HOUR_H }}
+                      className="absolute inset-x-0 cursor-pointer border-t border-black/[0.05] transition-colors hover:bg-accent-soft/20"
+                    />
+                  ))}
+
+                  {/* Sessions positioned by start time */}
+                  {daySessions.map((s) => {
+                    const startDate = new Date(s.startIso);
+                    const minutesFromStart = (startDate.getHours() - START_HOUR) * 60 + startDate.getMinutes();
+                    const top = (minutesFromStart / 60) * HOUR_H;
+                    const height = Math.max(24, (50 / 60) * HOUR_H);
+                    return (
+                      <div
+                        key={s.id}
+                        style={{ top, height }}
+                        className="absolute inset-x-0.5 z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DraggableSession session={s} />
+                      </div>
+                    );
+                  })}
+                </DroppableDay>
               </div>
-            </DroppableDay>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* Slot picker mini-modal */}
+      {slotPicker && (
+        <div
+          className="fixed inset-0 z-[62] flex items-center justify-center bg-black/10 backdrop-blur-[2px]"
+          onClick={() => setSlotPicker(null)}
+        >
+          <div
+            className="w-64 rounded-2xl border border-black/10 bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 text-center text-sm font-semibold text-ink">
+              {slotPicker.date.toLocaleDateString("he-IL", { weekday: "long", day: "2-digit", month: "2-digit" })}
+              {" · "}
+              {String(slotPicker.hour).padStart(2, "0")}:00
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  openAction("session", {
+                    date: toDateInput(slotPicker.date),
+                    hour: String(slotPicker.hour).padStart(2, "0"),
+                    minute: "00",
+                  });
+                  setSlotPicker(null);
+                }}
+                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink transition-colors hover:bg-accent-soft"
+              >
+                <span className="text-xl">🗓</span>
+                טיפול
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // הדרכה — stub, עמוד בפיתוח
+                  setSlotPicker(null);
+                }}
+                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink transition-colors hover:bg-blue-50"
+              >
+                <span className="text-xl">📚</span>
+                הדרכה
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  openAction("task", { date: toDateInput(slotPicker.date) });
+                  setSlotPicker(null);
+                }}
+                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink transition-colors hover:bg-accent-soft"
+              >
+                <span className="text-xl">✅</span>
+                משימה
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSlotPicker(null)}
+              className="mt-3 w-full text-xs text-muted hover:text-ink"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -617,13 +730,19 @@ function toDateKey(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function toDateInput(date: Date) {
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 function startOfWeek(date: Date) {
   const d = new Date(date);
-  d.setDate(d.getDate() - d.getDay()); // יום ראשון = 0
+  d.setDate(d.getDate() - d.getDay()); // ראשון = 0
   d.setHours(0, 0, 0, 0);
   return d;
 }

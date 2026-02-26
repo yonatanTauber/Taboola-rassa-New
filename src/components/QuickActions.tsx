@@ -17,6 +17,8 @@ import {
 
 type ActionType = "task" | "session" | "note";
 
+type ActionPrefill = { date?: string; hour?: string; minute?: string };
+
 type ToastInput = {
   message: string;
   durationMs?: number;
@@ -26,7 +28,7 @@ type ToastInput = {
 };
 
 type QuickActionsContextValue = {
-  openAction: (type: ActionType) => void;
+  openAction: (type: ActionType, prefill?: ActionPrefill) => void;
   showToast: (toast: ToastInput) => void;
   openMenu: boolean;
   menuAnimatingOut: boolean;
@@ -138,14 +140,21 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     setToast({ id: Date.now(), ...payload });
   }, []);
 
-  const openActionModal = useCallback((type: ActionType) => {
+  const openActionModal = useCallback((type: ActionType, prefill?: ActionPrefill) => {
     setOpenMenu(false);
     setMenuAnimatingOut(false);
     if (type === "session") {
-      setSessionForm(defaultSessionForm());
+      const base = defaultSessionForm();
+      setSessionForm({
+        ...base,
+        date: prefill?.date ?? base.date,
+        hour: prefill?.hour ?? base.hour,
+        minute: prefill?.minute ?? base.minute,
+      });
     }
     if (type === "task") {
-      setTaskForm(defaultTaskForm());
+      const base = defaultTaskForm();
+      setTaskForm({ ...base, dueDate: prefill?.date ?? base.dueDate });
     }
     if (type === "note") {
       setNoteForm(defaultNoteForm());
@@ -154,7 +163,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     setOpenAction(type);
   }, []);
 
-  const ctx = useMemo(
+  const ctx = useMemo<QuickActionsContextValue>(
     () => ({
       openAction: openActionModal,
       showToast,
