@@ -7,7 +7,7 @@ type Row = {
   id: string;
   firstName: string;
   lastName: string;
-  phone: string;
+  phone: string | null;
   email: string;
   gender: string;
   age: number | null;
@@ -96,7 +96,7 @@ export function PatientsTable({
       if (!genderFilters[genderKey]) return false;
       if (!ageGroupFilters[r.ageGroup]) return false;
       if (!searchText) return true;
-      const text = `${r.firstName} ${r.lastName} ${r.phone} ${r.email}`.toLowerCase();
+      const text = `${r.firstName} ${r.lastName} ${r.phone ?? ""} ${r.email}`.toLowerCase();
       return text.includes(searchText);
     });
 
@@ -239,7 +239,7 @@ export function PatientsTable({
                   ) : null}
                 </div>
                 <div className="mt-2 space-y-1 text-xs text-muted">
-                  <div>טלפון: {r.phone}</div>
+                  <div>טלפון: {r.phone ?? "—"}</div>
                   <div>מגדר: {genderLabel(r.gender)} · גיל: {r.age ?? "—"}</div>
                   <div>פגישה אחרונה: {formatDate(r.lastSessionAt)}</div>
                   <div>פגישה הבאה: {formatDate(r.nextSessionAt)}</div>
@@ -273,7 +273,7 @@ export function PatientsTable({
                       </span>
                     </Link>
                   </td>
-                  <td className="max-w-36 p-2"><span className="block truncate">{r.phone}</span></td>
+                  <td className="max-w-36 p-2"><span className="block truncate">{r.phone ?? "—"}</span></td>
                   <td className="whitespace-nowrap p-2">{genderLabel(r.gender)}</td>
                   <td className="whitespace-nowrap p-2">{r.age ?? "—"}</td>
                   <td className="whitespace-nowrap p-2">{formatDate(r.lastSessionAt)}</td>
@@ -311,7 +311,7 @@ function formatDate(iso: string | null) {
 
 function compareRowsByKey(a: Row, b: Row, key: ColumnKey) {
   if (key === "name") return compareName(a, b);
-  if (key === "phone") return compareText(a.phone, b.phone);
+  if (key === "phone") return compareText(a.phone ?? "", b.phone ?? "");
   if (key === "gender") return compareText(genderLabel(a.gender), genderLabel(b.gender));
   if (key === "age") return compareNullableNumber(a.age, b.age);
   if (key === "lastSession") return compareDateAsc(a.lastSessionAt, b.lastSessionAt);

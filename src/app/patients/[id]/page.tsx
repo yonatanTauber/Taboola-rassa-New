@@ -374,7 +374,7 @@ export default async function PatientDetailsPage({
           profileInitial={{
             firstName: patient.firstName,
             lastName: patient.lastName,
-            phone: patient.phone,
+            phone: patient.phone ?? "",
             email: patient.email ?? "",
             gender: patient.gender,
             dateOfBirth: patient.dateOfBirth ? toDateInput(patient.dateOfBirth) : "",
