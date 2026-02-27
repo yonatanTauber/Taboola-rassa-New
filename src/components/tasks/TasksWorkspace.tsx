@@ -49,8 +49,6 @@ export function TasksWorkspace({
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>(initialScopeFilter as ScopeFilter);
   const [busyTaskId, setBusyTaskId] = useState("");
 
-  const nowTs = useMemo(() => new Date(nowIso).getTime(), [nowIso]);
-
   const stats = useMemo(() => {
     const now = new Date(nowIso);
     const ws = weekStart(now);

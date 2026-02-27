@@ -13,7 +13,13 @@ export default async function TasksPage({
   const params = (await searchParams) ?? {};
   const initialPatientId = typeof params.patientId === "string" ? params.patientId : "ALL";
   const initialScopeRaw = typeof params.scope === "string" ? params.scope.toUpperCase() : "ALL";
-  const initialScope = initialScopeRaw === "OPEN" || initialScopeRaw === "DONE" || initialScopeRaw === "FUTURE" ? initialScopeRaw : "ALL";
+  const initialScope =
+    initialScopeRaw === "OPEN" ||
+    initialScopeRaw === "DONE" ||
+    initialScopeRaw === "CANCELED" ||
+    initialScopeRaw === "THIS_WEEK"
+      ? initialScopeRaw
+      : "ALL";
   const [tasks, patients] = await Promise.all([
     prisma.task.findMany({
       where: {
