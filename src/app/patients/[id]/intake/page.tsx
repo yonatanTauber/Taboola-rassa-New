@@ -1,19 +1,31 @@
+"use server";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { BackButton } from "@/components/BackButton";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
+import { IntakeForm } from "./intake-form";
 
 async function saveIntake(formData: FormData) {
-  "use server";
   const userId = await requireCurrentUserId();
-  if (!userId) return;
+  if (!userId) {
+    return { error: "Unauthorized" };
+  }
 
   const patientId = String(formData.get("patientId") ?? "").trim();
-  if (!patientId) return;
-  const patient = await prisma.patient.findFirst({ where: { id: patientId, ownerUserId: userId }, select: { id: true } });
-  if (!patient) return;
+  if (!patientId) {
+    return { error: "Patient ID is required" };
+  }
+
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, ownerUserId: userId },
+    select: { id: true },
+  });
+  if (!patient) {
+    return { error: "Patient not found" };
+  }
 
   const payload = {
     referralReason: normalize(formData.get("referralReason")),
@@ -39,6 +51,8 @@ async function saveIntake(formData: FormData) {
 
   revalidatePath(`/patients/${patientId}`);
   revalidatePath(`/patients/${patientId}/intake`);
+
+  return { success: true };
 }
 
 export default async function PatientIntakePage({ params }: { params: Promise<{ id: string }> }) {
@@ -62,36 +76,7 @@ export default async function PatientIntakePage({ params }: { params: Promise<{ 
         {patient.archivedAt ? <p className="mt-1 text-xs text-amber-700">המטופל במצב לא פעיל. ניתן לערוך את התיעוד ולהשיב אותו לפעיל מדף המטופל.</p> : null}
       </section>
 
-      <section className="app-section">
-        <form action={saveIntake} className="space-y-3">
-          <input type="hidden" name="patientId" value={patient.id} />
-          <Field label="סיבת הפנייה">
-            <input name="referralReason" defaultValue={intake?.referralReason ?? ""} className="app-field" />
-          </Field>
-          <Field label="מטרות טיפול">
-            <textarea name="goals" defaultValue={intake?.goals ?? ""} className="app-textarea min-h-24" />
-          </Field>
-          <Field label="טיפול קודם">
-            <input name="previousTherapy" defaultValue={intake?.previousTherapy ?? ""} className="app-field" />
-          </Field>
-          <Field label="טיפול תרופתי">
-            <input name="currentMedication" defaultValue={intake?.currentMedication ?? ""} className="app-field" />
-          </Field>
-          <Field label="אשפוזים">
-            <input name="hospitalizations" defaultValue={intake?.hospitalizations ?? ""} className="app-field" />
-          </Field>
-          <Field label="הערכת סיכון">
-            <textarea name="riskAssessment" defaultValue={intake?.riskAssessment ?? ""} className="app-textarea min-h-20" />
-          </Field>
-          <Field label="מלל חופשי">
-            <textarea name="freeText" defaultValue={intake?.freeText ?? ""} className="app-textarea min-h-24" />
-          </Field>
-          <div className="flex justify-end gap-2">
-            <Link href={`/patients/${patient.id}`} className="app-btn app-btn-secondary">חזרה למטופל</Link>
-            <button className="app-btn app-btn-primary">שמירה</button>
-          </div>
-        </form>
-      </section>
+      <IntakeForm patientId={patient.id} initialIntake={intake} saveIntake={saveIntake} />
     </main>
   );
 }
@@ -99,13 +84,4 @@ export default async function PatientIntakePage({ params }: { params: Promise<{ 
 function normalize(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text || null;
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="space-y-1">
-      <div className="text-xs text-muted">{label}</div>
-      {children}
-    </label>
-  );
 }

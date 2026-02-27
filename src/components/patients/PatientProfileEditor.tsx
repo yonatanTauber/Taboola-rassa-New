@@ -182,6 +182,7 @@ export function PatientProfileEditor({
             onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value as FormState["gender"] }))}
             className="app-select disabled:bg-black/[0.03]"
           >
+            <option value="" disabled className="text-muted">מגדר</option>
             <option value="MALE">גבר</option>
             <option value="FEMALE">אישה</option>
             <option value="OTHER">אחר</option>
