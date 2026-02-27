@@ -66,6 +66,7 @@ export async function GET(req: Request) {
       href: `/sessions/${s.id}`,
       kind: "session" as const,
       title: "פגישה",
+      isRecurringTemplate: s.isRecurringTemplate,
     })),
     ...guidances
       .filter((g) => g.scheduledAt)
