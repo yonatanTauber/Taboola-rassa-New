@@ -69,21 +69,15 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
       </section>
 
       <section className="rounded-2xl border border-black/10 bg-white p-4">
-        <div className="mb-3 flex gap-2">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">משימות קשורות</h2>
           <Link
             href={`/tasks/new?sessionId=${session.id}`}
-            className="app-btn app-btn-primary text-xs"
+            className="app-btn app-btn-primary text-xs px-2 py-1"
           >
-            + משימה
-          </Link>
-          <Link
-            href={`/patients/${session.patient.id}/guidance?sessionId=${session.id}`}
-            className="app-btn app-btn-secondary text-xs"
-          >
-            + הדרכה
+            +
           </Link>
         </div>
-        <h2 className="mb-2 text-lg font-semibold">משימות קשורות</h2>
         <ul className="space-y-2 text-sm">
           {session.tasks.map((t) => (
             <li key={t.id}>
@@ -106,8 +100,16 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
             </li>
           ))}
         </ul>
-        <h3 className="mb-2 mt-5 text-sm font-semibold text-muted">מסמכים רפואיים מקושרים</h3>
-        <ul className="space-y-2 text-sm">
+        <div className="mt-5 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-muted">מסמכים רפואיים מקושרים</h3>
+          <Link
+            href={`/medical-documents/new?patientId=${session.patient.id}&sessionId=${session.id}`}
+            className="app-btn app-btn-secondary text-xs px-2 py-1"
+          >
+            +
+          </Link>
+        </div>
+        <ul className="mb-3 space-y-2 text-sm">
           {session.medicalDocuments.length > 0 ? (
             session.medicalDocuments.map((doc) => (
               <li key={doc.id}>
@@ -125,8 +127,16 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
             <li className="rounded-lg bg-black/[0.02] px-3 py-2 text-muted">אין מסמכים רפואיים מקושרים</li>
           )}
         </ul>
-        <h3 className="mb-2 mt-5 text-sm font-semibold text-muted">קבלות משויכות</h3>
-        <ul className="space-y-2 text-sm">
+        <div className="mt-5 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-muted">קבלות משויכות</h3>
+          <Link
+            href={`/receipts/new?sessionId=${session.id}`}
+            className="app-btn app-btn-secondary text-xs px-2 py-1"
+          >
+            +
+          </Link>
+        </div>
+        <ul className="mb-3 space-y-2 text-sm">
           <SessionReceiptsPager
             items={session.paymentAllocations.map((allocation) => ({
               id: allocation.id,
@@ -136,8 +146,16 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
             }))}
           />
         </ul>
-        <h3 className="mb-2 mt-5 text-sm font-semibold text-muted">הדרכות מקושרות</h3>
-        <ul className="space-y-2 text-sm">
+        <div className="mt-5 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-muted">הדרכות מקושרות</h3>
+          <Link
+            href={`/patients/${session.patient.id}/guidance?sessionId=${session.id}`}
+            className="app-btn app-btn-secondary text-xs px-2 py-1"
+          >
+            +
+          </Link>
+        </div>
+        <ul className="mb-3 space-y-2 text-sm">
           {session.guidanceLinks.length > 0 ? (
             session.guidanceLinks.map((link) => (
               <li key={link.guidanceId}>

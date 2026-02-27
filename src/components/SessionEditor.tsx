@@ -32,6 +32,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const router = useRouter();
   const { showToast } = useQuickActions();
   const [form, setForm] = useState(session);
+  const [isEditing, setIsEditing] = useState(false);
   const localDT = utcToLocalDateTimeStr(session.scheduledAt);
   const [datePart, setDatePart] = useState(localDT.slice(0, 10));
   const [hourPart, setHourPart] = useState(localDT.slice(11, 13));
@@ -41,6 +42,9 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [undocumentedConfirmOpen, setUndocumentedConfirmOpen] = useState(false);
+
+  // Check if status is finalized (not SCHEDULED anymore)
+  const isFinalized = form.status !== "SCHEDULED";
 
   async function save(allowUndocumented = false) {
     // Build as local time in browser → correct UTC conversion via toISOString()
@@ -190,25 +194,37 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       <textarea value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="תוכן הפגישה" className="app-textarea min-h-32" />
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCancelOpen(true)}
-            className="app-btn app-btn-secondary"
-            disabled={form.status === "CANCELED" || canceling || deleting}
-          >
-            בטל פגישה
-          </button>
-          <button type="button" onClick={() => setDeleteOpen(true)} className="app-btn app-btn-secondary text-danger" disabled={canceling || deleting}>
-            מחק פגישה
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => router.back()} className="app-btn app-btn-secondary">ביטול</button>
-          <button onClick={() => void save()} className="app-btn app-btn-primary">
-            {form.note.trim().length > 10 ? "אשר" : "עדכן"}
-          </button>
-        </div>
+        {/* Show action buttons only if: not finalized OR in editing mode */}
+        {!isFinalized || isEditing ? (
+          <>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelOpen(true)}
+                className="app-btn app-btn-secondary"
+                disabled={form.status === "CANCELED" || canceling || deleting}
+              >
+                בטל פגישה
+              </button>
+              <button type="button" onClick={() => setDeleteOpen(true)} className="app-btn app-btn-secondary text-danger" disabled={canceling || deleting}>
+                מחק פגישה
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setIsEditing(false)} className="app-btn app-btn-secondary">ביטול</button>
+              <button onClick={() => void save()} className="app-btn app-btn-primary">
+                {form.note.trim().length > 10 ? "אשר" : "עדכן"}
+              </button>
+            </div>
+          </>
+        ) : (
+          /* Show only Edit button when finalized */
+          <div className="ms-auto">
+            <button onClick={() => setIsEditing(true)} className="app-btn app-btn-secondary">
+              עריכה
+            </button>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog
