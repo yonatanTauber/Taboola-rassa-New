@@ -4,6 +4,7 @@ import { BackButton } from "@/components/BackButton";
 import { FixedSessionPicker } from "@/components/patients/FixedSessionPicker";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
+import { generateUpcomingSessions } from "@/lib/recurring-sessions";
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
@@ -59,7 +60,7 @@ async function createPatient(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
-  const gender = String(formData.get("gender") ?? "OTHER");
+  const gender = String(formData.get("gender") ?? "").trim() || "OTHER";
   const dateOfBirth = String(formData.get("dateOfBirth") ?? "").trim();
   const treatmentStartDateRaw = String(formData.get("treatmentStartDate") ?? "").trim();
   const fixedSessionDay = String(formData.get("fixedSessionDay") ?? "").trim();
@@ -148,6 +149,26 @@ async function createPatient(formData: FormData) {
         },
       });
     }
+
+    // Auto-generate recurring sessions if fixed schedule was set
+    if (created.fixedSessionDay !== null && created.fixedSessionTime) {
+      const { dates } = await generateUpcomingSessions(created.id, {
+        fixedSessionDay: created.fixedSessionDay,
+        fixedSessionTime: created.fixedSessionTime,
+      }, prisma);
+      if (dates.length > 0) {
+        for (const date of dates) {
+          await prisma.session.create({
+            data: {
+              patientId: created.id,
+              scheduledAt: date,
+              status: "SCHEDULED",
+              isRecurringTemplate: true,
+            },
+          });
+        }
+      }
+    }
   } catch (error) {
     console.error("createPatient failed", error);
     redirect("/patients/new?error=create-failed");
@@ -188,7 +209,10 @@ export default async function NewPatientPage({
           <div className="grid gap-2 md:grid-cols-2">
             <input required name="firstName" placeholder="שם פרטי *" className="app-field" />
             <input required name="lastName" placeholder="שם משפחה *" className="app-field" />
-            <select name="gender" className="app-select">
+            <select name="gender" defaultValue="" className="app-select">
+              <option value="" disabled className="text-muted">
+                מגדר (אופציונלי)
+              </option>
               <option value="MALE">גבר</option>
               <option value="FEMALE">אישה</option>
               <option value="OTHER">אחר</option>

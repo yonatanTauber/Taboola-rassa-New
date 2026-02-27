@@ -70,6 +70,9 @@ export default async function PatientsPage({
                 בלוקים
               </Link>
             </div>
+            <Link href="/patients/archived" className="app-btn app-btn-secondary !px-3 !py-1.5 text-sm">
+              ארכיון
+            </Link>
             <Link
               href="/patients/new"
               className="app-btn app-btn-primary !px-3 !py-1.5 text-sm"

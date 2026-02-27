@@ -1,33 +1,84 @@
 import { SessionStatus } from "@prisma/client";
 import { PrismaClient } from "@prisma/client";
 
+const TZ = "Asia/Jerusalem";
+
 /**
- * Return the next occurrence of weekday from startDate
+ * Get today's date string in Israel timezone (YYYY-MM-DD)
+ */
+function toIsraelDateStr(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, dateStyle: "short" }).format(date);
+}
+
+/**
+ * Get the weekday (0=Sun, 1=Mon, ..., 6=Sat) in Israel timezone
+ */
+function getIsraelWeekday(date: Date): number {
+  const dayName = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short" }).format(date);
+  const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return days[dayName] ?? 0;
+}
+
+/**
+ * Build a UTC Date for a given Israel-local date + hour + minute.
+ * e.g. date "2025-02-25" + hour 15 + minute 30 in Asia/Jerusalem → UTC Date
+ */
+function buildIsraelDateTime(dateStr: string, hour: number, minute: number): Date {
+  // Parse as local Israel time by constructing a reference timestamp
+  // We use the trick: parse midnight UTC for that date, then find the Israel offset
+  const naive = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`);
+  // naive is interpreted as LOCAL time of the server — instead, build proper UTC
+  // by using the Intl offset approach
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(naive);
+
+  // If we just need to create a time in Israel tz from a known date+hour+minute,
+  // we can use the offset from a reference point:
+  const refDate = new Date(`${dateStr}T12:00:00Z`); // noon UTC as reference
+  const israelNoon = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(refDate);
+  const [israelHourStr] = israelNoon.split(":");
+  const israelHour = parseInt(israelHourStr, 10);
+  // offset in hours: israelHour - 12 (since reference is noon UTC)
+  const offsetHours = israelHour - 12;
+
+  // Build the target UTC time
+  const utcDate = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`);
+  utcDate.setUTCHours(utcDate.getUTCHours() - offsetHours);
+  return utcDate;
+}
+
+/**
+ * Return the next occurrence of weekday from startDate (in Israel timezone)
  * weekday: 0=Sun, 1=Mon, ..., 6=Sat
- * Returns the next date with same weekday >= startDate
+ * Returns the next Israel date string (YYYY-MM-DD) with that weekday >= startDate
  */
 export function getDateOfWeekday(startDate: Date, weekday: number): Date {
-  const current = new Date(startDate);
-  current.setHours(0, 0, 0, 0);
+  const startStr = toIsraelDateStr(startDate);
+  const current = new Date(`${startStr}T00:00:00Z`);
 
-  const dayDiff = (weekday - current.getDay() + 7) % 7;
+  const currentWeekday = getIsraelWeekday(current);
+  let dayDiff = (weekday - currentWeekday + 7) % 7;
 
   if (dayDiff === 0) {
-    // Same weekday — check if we should use this week or next week
-    // Use this week if start date hasn't occurred yet, else next week
-    if (current.getTime() < startDate.getTime()) {
-      // Current is at midnight, startDate is after midnight
-      // Use this week's occurrence
-      return current;
-    } else {
-      // Use next week
-      current.setDate(current.getDate() + 7);
-      return current;
-    }
-  } else {
-    current.setDate(current.getDate() + dayDiff);
-    return current;
+    // Same weekday — always use next week (startDate is "now", so this week's is past/current)
+    dayDiff = 7;
   }
+
+  current.setUTCDate(current.getUTCDate() + dayDiff);
+  return current;
 }
 
 /**
@@ -58,12 +109,12 @@ export function detectPotentialMerge(
   const [fixedHour, fixedMinute] = patient.fixedSessionTime
     .split(":")
     .map(Number);
-  const expectedDate = getDateOfWeekday(newSessionDate, patient.fixedSessionDay);
-  const expectedTime = new Date(expectedDate);
-  expectedTime.setHours(fixedHour, fixedMinute, 0, 0);
 
-  const newTime = new Date(newSessionDate);
-  newTime.setHours(newSessionHour, newSessionMinute, 0, 0);
+  const newDateStr = toIsraelDateStr(newSessionDate);
+  const expectedDate = getDateOfWeekday(newSessionDate, patient.fixedSessionDay);
+  const expectedDateStr = toIsraelDateStr(expectedDate);
+  const expectedTime = buildIsraelDateTime(expectedDateStr, fixedHour, fixedMinute);
+  const newTime = buildIsraelDateTime(newDateStr, newSessionHour, newSessionMinute);
 
   const diffSeconds = Math.abs(newTime.getTime() - expectedTime.getTime()) / 1000;
   const MERGE_THRESHOLD_SECONDS = 30 * 60; // 30 minutes
@@ -72,7 +123,7 @@ export function detectPotentialMerge(
     // Time is close enough — check if we should suggest same-day merge
     const sameDayCandidate = existingSessions.find(
       (s) =>
-        s.scheduledAt.toDateString() === newSessionDate.toDateString() &&
+        toIsraelDateStr(s.scheduledAt) === newDateStr &&
         Math.abs(s.scheduledAt.getTime() - newTime.getTime()) <=
           MERGE_THRESHOLD_SECONDS * 1000
     );
@@ -91,8 +142,8 @@ export function detectPotentialMerge(
 /**
  * Generate upcoming recurring sessions for a patient
  * Respects: fixedSessionDay, fixedSessionTime
- * Avoids duplicates (checks existing sessions)
- * Returns array of dates to create
+ * Avoids duplicates (checks existing sessions by Israel date string)
+ * Returns array of UTC dates to create
  */
 export async function generateUpcomingSessions(
   patientId: string,
@@ -102,7 +153,7 @@ export async function generateUpcomingSessions(
   },
   prisma: PrismaClient
 ): Promise<{ dates: Date[]; summary: string }> {
-  if (!patient.fixedSessionDay || !patient.fixedSessionTime) {
+  if (patient.fixedSessionDay === null || !patient.fixedSessionTime) {
     return { dates: [], summary: "No recurring schedule set" };
   }
 
@@ -110,9 +161,6 @@ export async function generateUpcomingSessions(
   const [hour, minute] = patient.fixedSessionTime.split(":").map(Number);
   const futureRange = new Date(now);
   futureRange.setDate(futureRange.getDate() + 30);
-
-  const sessions: Date[] = [];
-  let current = getDateOfWeekday(now, patient.fixedSessionDay);
 
   // Get existing sessions to avoid duplicates
   const existing = await prisma.session.findMany({
@@ -124,17 +172,34 @@ export async function generateUpcomingSessions(
   });
 
   const existingDates = new Set(
-    existing.map((s) => s.scheduledAt.toISOString().split("T")[0])
+    existing.map((s) => toIsraelDateStr(s.scheduledAt))
   );
 
-  while (current <= futureRange) {
-    const dateStr = current.toISOString().split("T")[0];
+  const sessions: Date[] = [];
+
+  // Start from the next occurrence of the fixed weekday
+  let currentDateStr = toIsraelDateStr(now);
+  let currentUTC = new Date(`${currentDateStr}T00:00:00Z`);
+
+  // Find the first occurrence of the fixed weekday on or after today
+  const currentWeekday = getIsraelWeekday(currentUTC);
+  let dayDiff = (patient.fixedSessionDay - currentWeekday + 7) % 7;
+  if (dayDiff === 0) {
+    // Check if today's session time has already passed
+    const todaySession = buildIsraelDateTime(currentDateStr, hour, minute);
+    if (todaySession <= now) {
+      dayDiff = 7; // Move to next week
+    }
+  }
+  currentUTC.setUTCDate(currentUTC.getUTCDate() + dayDiff);
+
+  while (currentUTC <= futureRange) {
+    const dateStr = toIsraelDateStr(currentUTC);
     if (!existingDates.has(dateStr)) {
-      const sessionTime = new Date(current);
-      sessionTime.setHours(hour, minute, 0, 0);
+      const sessionTime = buildIsraelDateTime(dateStr, hour, minute);
       sessions.push(sessionTime);
     }
-    current.setDate(current.getDate() + 7); // Next week
+    currentUTC.setUTCDate(currentUTC.getUTCDate() + 7); // Next week
   }
 
   return {

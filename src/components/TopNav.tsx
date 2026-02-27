@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { AnalogClock } from "@/components/AnalogClock";
 import { AppLogo } from "@/components/AppLogo";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { QuickAddControl } from "@/components/QuickAddControl";
 
 const PRIMARY_ITEMS = [
@@ -40,7 +41,8 @@ export function TopNav({ canManageInvites = false }: { canManageInvites?: boolea
         <Link href="/" className="rounded-xl p-1 transition hover:bg-black/[0.04]" aria-label="חזרה לדף היומי">
           <AppLogo compact />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-2">
+          <GlobalSearch />
           <QuickAddControl />
           <button
             type="button"
@@ -80,6 +82,8 @@ export function TopNav({ canManageInvites = false }: { canManageInvites?: boolea
           })}
 
           <QuickAddControl />
+
+          <GlobalSearch />
 
           {items.slice(PRIMARY_ITEMS.length).map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

@@ -395,7 +395,8 @@ export default async function PatientDetailsPage({
           previousTherapy={latestIntake?.previousTherapy ?? null}
           currentMedication={latestIntake?.currentMedication ?? null}
           hospitalizations={latestIntake?.hospitalizations ?? null}
-          figures={patient.figures.map((f) => ({ id: f.id, name: f.name }))}
+          figures={patient.figures.map((f) => ({ id: f.id, name: f.name, role: f.role }))}
+          medicalDocuments={patient.medicalDocuments.map((d) => ({ id: d.id, title: d.title, filePath: d.filePath }))}
           conceptLinks={patient.conceptLinks.map((link) => ({ id: link.id, label: link.label, href: link.href ?? null }))}
           linkedResearchNotes={linkedResearchNotes.map((note) => ({
             id: note.id,
