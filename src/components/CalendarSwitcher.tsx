@@ -1,11 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { TaskChecklist } from "@/components/TaskChecklist";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, useDraggable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { useQuickActions } from "@/components/QuickActions";
 
-type CalendarSession = {
+const HEB_DAYS_LONG = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+// Hourly grid constants
+const HOUR_H = 56; // px per hour
+const START_HOUR = 8;
+const END_HOUR = 21;
+const HOUR_RANGE = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+const GRID_H = HOUR_RANGE.length * HOUR_H;
+
+export type CalendarSession = {
   id: string;
   patient: string;
   patientId: string;
@@ -16,7 +28,7 @@ type CalendarSession = {
   title?: string;
 };
 
-type CalendarTask = {
+export type CalendarTask = {
   id: string;
   title: string;
   dueIso: string;
@@ -26,62 +38,425 @@ type CalendarTask = {
 
 type ViewMode = "week" | "month";
 
-const HOUR_H = 56; // px per hour
-const START_HOUR = 8;
-const END_HOUR = 21;
-const HOUR_RANGE = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
-const GRID_H = HOUR_RANGE.length * HOUR_H;
+type DragItem =
+  | { type: "session"; item: CalendarSession }
+  | { type: "task"; item: CalendarTask };
 
 export function CalendarSwitcher({
-  sessions,
-  tasks,
+  sessions: initialSessions,
+  tasks: initialTasks,
 }: {
   sessions: CalendarSession[];
   tasks: CalendarTask[];
 }) {
+  const router = useRouter();
   const [mode, setMode] = useState<ViewMode>("week");
+  const [anchor, setAnchor] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
   const [taskPopup, setTaskPopup] = useState<{ dateLabel: string; tasks: CalendarTask[] } | null>(null);
+  const [sessions, setSessions] = useState(initialSessions);
+  const [tasks, setTasks] = useState(initialTasks);
+  const [dragging, setDragging] = useState<DragItem | null>(null);
+  const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const visibleSessions = useMemo(() => {
-    const now = new Date();
-    return sessions.filter((session) => inRange(new Date(session.startIso), now, mode));
-  }, [mode, sessions]);
+  // Compute the date range for the current view
+  const { rangeStart, rangeEnd } = useMemo(() => {
+    if (mode === "week") {
+      const start = startOfWeek(anchor);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 7);
+      return { rangeStart: start, rangeEnd: end };
+    } else {
+      const start = startOfWeek(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 42);
+      return { rangeStart: start, rangeEnd: end };
+    }
+  }, [anchor, mode]);
 
-  const visibleTasks = useMemo(() => {
-    const now = new Date();
-    return tasks.filter((task) => inRange(new Date(task.dueIso), now, mode));
-  }, [mode, tasks]);
+  // Fetch data whenever the range changes
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const from = rangeStart.toISOString();
+    const to = rangeEnd.toISOString();
+    fetch(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.sessions) setSessions(data.sessions);
+        if (data.tasks) setTasks(data.tasks);
+      })
+      .catch(() => {/* silent – keep old data */})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [rangeStart.toISOString(), rangeEnd.toISOString()]);
+
+  const visibleSessions = useMemo(
+    () => sessions.filter((s) => {
+      const d = new Date(s.startIso);
+      return d >= rangeStart && d < rangeEnd;
+    }),
+    [sessions, rangeStart, rangeEnd]
+  );
+
+  const visibleTasks = useMemo(
+    () => tasks.filter((t) => {
+      const d = new Date(t.dueIso);
+      return d >= rangeStart && d < rangeEnd;
+    }),
+    [tasks, rangeStart, rangeEnd]
+  );
+
+  const navigate = useCallback((delta: number) => {
+    setAnchor((prev) => {
+      const d = new Date(prev);
+      if (mode === "week") {
+        d.setDate(d.getDate() + delta * 7);
+      } else {
+        d.setMonth(d.getMonth() + delta);
+        d.setDate(1);
+      }
+      return d;
+    });
+  }, [mode]);
+
+  const goToday = useCallback(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setAnchor(d);
+  }, []);
+
+  const periodLabel = useMemo(() => {
+    if (mode === "week") {
+      const start = startOfWeek(anchor);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const startStr = start.toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
+      const endStr = end.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
+      return `${startStr} – ${endStr}`;
+    } else {
+      return anchor.toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+    }
+  }, [anchor, mode]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const id = event.active.id.toString();
+    if (id.startsWith("session:") || id.startsWith("guidance:")) {
+      const rawId = id.replace(/^(session|guidance):/, "");
+      const item = sessions.find((s) => s.id === rawId);
+      if (item) setDragging({ type: "session", item });
+    } else if (id.startsWith("task:")) {
+      const rawId = id.replace("task:", "");
+      const item = tasks.find((t) => t.id === rawId);
+      if (item) setDragging({ type: "task", item });
+    }
+  }, [sessions, tasks]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setDragging(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id.toString();
+    const overId = over.id.toString();
+    if (!overId.startsWith("day:")) return;
+
+    // Fix: parse date as local (not UTC) to avoid off-by-one in Israel (UTC+2)
+    const targetDateStr = overId.replace("day:", "");
+    const [y, m, day_] = targetDateStr.split("-").map(Number);
+    const targetDate = new Date(y, m - 1, day_); // local midnight
+
+    if (activeId.startsWith("session:") || activeId.startsWith("guidance:")) {
+      const kind = activeId.startsWith("guidance:") ? "guidance" : "session";
+      const rawId = activeId.replace(/^(session|guidance):/, "");
+      const original = sessions.find((s) => s.id === rawId);
+      if (!original) return;
+
+      const originalIso = original.startIso;
+      const originalTime = new Date(originalIso);
+      const newDate = new Date(targetDate);
+      newDate.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
+      if (sameDay(originalTime, newDate)) return;
+
+      setSessions((prev) =>
+        prev.map((s) => s.id === rawId ? { ...s, startIso: newDate.toISOString() } : s)
+      );
+
+      const endpoint = kind === "guidance" ? `/api/guidance/${rawId}` : `/api/sessions/${rawId}`;
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledAt: newDate.toISOString() }),
+      });
+
+      if (!res.ok) {
+        setSessions((prev) => prev.map((s) => s.id === rawId ? { ...s, startIso: originalIso } : s));
+        setToast({ message: "שגיאה בעדכון התאריך" });
+      } else {
+        const snapshot = [...sessions];
+        router.refresh();
+        setToast({
+          message: "תאריך עודכן",
+          undo: () => {
+            setSessions(snapshot);
+            fetch(endpoint, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ scheduledAt: originalIso }),
+            }).then(() => router.refresh());
+            setToast(null);
+          },
+        });
+      }
+    } else if (activeId.startsWith("task:")) {
+      const rawId = activeId.replace("task:", "");
+      const original = tasks.find((t) => t.id === rawId);
+      if (!original) return;
+
+      const originalIso = original.dueIso;
+      const originalTime = new Date(originalIso);
+      const newDate = new Date(targetDate);
+      newDate.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
+      if (sameDay(originalTime, newDate)) return;
+
+      setTasks((prev) =>
+        prev.map((t) => t.id === rawId ? { ...t, dueIso: newDate.toISOString() } : t)
+      );
+
+      const res = await fetch(`/api/tasks/${rawId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueAt: newDate.toISOString() }),
+      });
+
+      if (!res.ok) {
+        setTasks((prev) => prev.map((t) => t.id === rawId ? { ...t, dueIso: originalIso } : t));
+        setToast({ message: "שגיאה בעדכון התאריך" });
+      } else {
+        const snapshot = [...tasks];
+        router.refresh();
+        setToast({
+          message: "תאריך עודכן",
+          undo: () => {
+            setTasks(snapshot);
+            fetch(`/api/tasks/${rawId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ dueAt: originalIso }),
+            }).then(() => router.refresh());
+            setToast(null);
+          },
+        });
+      }
+    }
+
+    setTimeout(() => setToast(null), 4000);
+  }, [sessions, tasks, router]);
+
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const isCurrentPeriod = useMemo(() => {
+    if (mode === "week") {
+      return sameDay(startOfWeek(anchor), startOfWeek(today));
+    }
+    return anchor.getMonth() === today.getMonth() && anchor.getFullYear() === today.getFullYear();
+  }, [anchor, mode, today]);
+
+  // Require 5px movement before a drag starts — lets clicks pass through normally
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   return (
     <section className="app-section">
-      <div className="mb-3 flex items-center justify-between">
+      {/* Header: title + nav arrows + mode switcher */}
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">יומן</h2>
+        <div className="flex items-center gap-1 mr-auto">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="rounded-lg border border-black/12 px-2 py-1 text-sm text-muted hover:bg-accent-soft leading-none"
+            aria-label="תקופה הבאה"
+          >
+            ‹
+          </button>
+          <span className="text-xs font-medium text-ink whitespace-nowrap px-1">
+            {loading ? <span className="opacity-40">{periodLabel}</span> : periodLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate(1)}
+            className="rounded-lg border border-black/12 px-2 py-1 text-sm text-muted hover:bg-accent-soft leading-none"
+            aria-label="תקופה קודמת"
+          >
+            ›
+          </button>
+          {!isCurrentPeriod && (
+            <button
+              type="button"
+              onClick={goToday}
+              className="rounded-lg border border-black/12 px-2 py-1 text-xs text-accent hover:bg-accent-soft"
+            >
+              {mode === "week" ? "השבוע" : "החודש"}
+            </button>
+          )}
+        </div>
         <div className="flex gap-1 rounded-xl border border-black/12 p-1 text-[11px]">
           <ModeButton active={mode === "week"} onClick={() => setMode("week")} label="שבועית" />
           <ModeButton active={mode === "month"} onClick={() => setMode("month")} label="חודשית" />
         </div>
       </div>
 
-      {mode === "week" && <WeekBoard sessions={visibleSessions} tasks={visibleTasks} onOpenDayTasks={setTaskPopup} />}
-      {mode === "month" && <MonthBoard sessions={visibleSessions} tasks={visibleTasks} onOpenDayTasks={setTaskPopup} />}
-      {taskPopup ? <DayTasksModal dateLabel={taskPopup.dateLabel} tasks={taskPopup.tasks} onClose={() => setTaskPopup(null)} /> : null}
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {mode === "week" && (
+          <WeekBoard
+            anchor={anchor}
+            sessions={visibleSessions}
+            tasks={visibleTasks}
+            today={today}
+            onOpenDayTasks={setTaskPopup}
+          />
+        )}
+        {mode === "month" && (
+          <MonthBoard
+            anchor={anchor}
+            sessions={visibleSessions}
+            tasks={visibleTasks}
+            today={today}
+            onOpenDayTasks={setTaskPopup}
+          />
+        )}
+        <DragOverlay>
+          {dragging?.type === "session" && (
+            <div className={`rounded-lg px-2 py-1 text-[10px] text-ink shadow-lg ${dragging.item.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}>
+              {dragging.item.patient}
+            </div>
+          )}
+          {dragging?.type === "task" && (
+            <div className="rounded-lg bg-white px-2 py-1 text-[10px] text-ink shadow-lg border border-black/10">
+              {dragging.item.title}
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+
+      {taskPopup && (
+        <DayTasksModal dateLabel={taskPopup.dateLabel} tasks={taskPopup.tasks} onClose={() => setTaskPopup(null)} />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 flex items-center gap-3 rounded-xl bg-ink px-4 py-2.5 text-sm text-white shadow-2xl">
+          <span>{toast.message}</span>
+          {toast.undo && (
+            <button type="button" onClick={toast.undo} className="rounded-lg border border-white/30 px-2 py-0.5 text-xs hover:bg-white/10">
+              בטל
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
+function DroppableDay({
+  dateKey,
+  children,
+  className,
+  style,
+}: {
+  dateKey: string;
+  children: React.ReactNode;
+  className: string;
+  style?: React.CSSProperties;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `day:${dateKey}` });
+  return (
+    <div ref={setNodeRef} style={style} className={`${className} ${isOver ? "ring-2 ring-accent ring-inset" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+function DraggableSession({ session }: { session: CalendarSession }) {
+  const dragId = `${session.kind}:${session.id}`;
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId });
+  const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none h-full">
+      <Link
+        href={session.href}
+        className={`block h-full overflow-hidden rounded-md px-1 py-0.5 text-[9px] text-ink hover:brightness-[0.97] cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+        draggable={false}
+      >
+        <div className="font-mono tabular-nums leading-tight">{timeRangeLabel(new Date(session.startIso))}</div>
+        {session.title && <div className="truncate text-[8px] text-muted leading-tight">{session.title}</div>}
+        <div className="truncate leading-tight">{session.patient}</div>
+      </Link>
+    </div>
+  );
+}
+
+function DraggableSessionCompact({ session }: { session: CalendarSession }) {
+  const dragId = `${session.kind}:${session.id}`;
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: dragId });
+  const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
+      <Link
+        href={session.href}
+        className={`block truncate rounded px-1 py-0.5 text-[10px] text-ink cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+        draggable={false}
+      >
+        {timeRangeLabel(new Date(session.startIso))} · {session.title ? `${session.title} · ` : ""}{session.patient}
+      </Link>
+    </div>
+  );
+}
+
+function DraggableTask({ task, onOpen }: { task: CalendarTask; onOpen: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `task:${task.id}` });
+  const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
+      <button
+        type="button"
+        onClick={() => { if (!isDragging) onOpen(); }}
+        className="w-full rounded bg-white px-2 py-1 text-[10px] text-ink transition hover:bg-accent-soft cursor-grab active:cursor-grabbing"
+      >
+        {task.title.length > 20 ? task.title.slice(0, 20) + "…" : task.title}
+      </button>
+    </div>
+  );
+}
+
 function WeekBoard({
+  anchor,
   sessions,
   tasks,
+  today,
   onOpenDayTasks,
 }: {
+  anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
+  today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
 }) {
   const { openAction } = useQuickActions();
   const [slotPicker, setSlotPicker] = useState<{ date: Date; hour: number } | null>(null);
 
-  const start = startOfWeek(new Date());
+  const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }).map((_, idx) => {
     const d = new Date(start);
     d.setDate(start.getDate() + idx);
@@ -97,7 +472,7 @@ function WeekBoard({
             <div className="h-8 border-b border-black/8" />
             {HOUR_RANGE.map((h) => (
               <div key={h} style={{ height: HOUR_H }} className="relative border-t border-black/[0.06]">
-                <span className="absolute -top-[9px] end-1.5 text-[9px] tabular-nums text-muted select-none">
+                <span className="absolute -top-[9px] end-1.5 select-none text-[9px] tabular-nums text-muted">
                   {String(h).padStart(2, "0")}:00
                 </span>
               </div>
@@ -106,17 +481,18 @@ function WeekBoard({
 
           {/* Day columns */}
           {days.map((day) => {
+            const dateKey = toDateKey(day);
             const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), day));
             const daySessions = sessions
               .filter((s) => sameDay(new Date(s.startIso), day))
               .sort((a, b) => +new Date(a.startIso) - +new Date(b.startIso));
-            const isToday = sameDay(day, new Date());
+            const isToday = sameDay(day, today);
 
             return (
-              <div key={day.toISOString()} className="relative flex-1 min-w-[72px] border-s border-black/8 first:border-s-0">
+              <div key={dateKey} className="relative min-w-[72px] flex-1 border-s border-black/8 first:border-s-0">
                 {/* Day header */}
-                <div className={`sticky top-0 z-20 h-8 border-b border-black/8 px-1 text-center text-[10px] flex items-center justify-center gap-1 ${isToday ? "bg-accent-soft text-accent font-semibold" : "bg-white text-muted"}`}>
-                  <span>{day.toLocaleDateString("he-IL", { weekday: "short" })}</span>
+                <div className={`sticky top-0 z-20 flex h-8 items-center justify-center gap-1 border-b border-black/8 px-1 text-center text-[10px] ${isToday ? "bg-accent-soft font-semibold text-accent" : "bg-white text-muted"}`}>
+                  <span>{`יום ${HEB_DAYS_LONG[day.getDay()]}`}</span>
                   <span className={`inline-flex size-4 items-center justify-center rounded-full text-[10px] ${isToday ? "bg-accent text-white" : ""}`}>
                     {day.getDate()}
                   </span>
@@ -131,8 +507,8 @@ function WeekBoard({
                   )}
                 </div>
 
-                {/* Grid area */}
-                <div className="relative" style={{ height: GRID_H }}>
+                {/* Drop zone = the hourly grid */}
+                <DroppableDay dateKey={dateKey} className="relative" style={{ height: GRID_H }}>
                   {/* Clickable hour slots */}
                   {HOUR_RANGE.map((h, i) => (
                     <div
@@ -143,29 +519,24 @@ function WeekBoard({
                     />
                   ))}
 
-                  {/* Sessions */}
+                  {/* Sessions positioned by start time */}
                   {daySessions.map((s) => {
                     const startDate = new Date(s.startIso);
                     const minutesFromStart = (startDate.getHours() - START_HOUR) * 60 + startDate.getMinutes();
                     const top = (minutesFromStart / 60) * HOUR_H;
                     const height = Math.max(24, (50 / 60) * HOUR_H);
                     return (
-                      <Link
+                      <div
                         key={s.id}
-                        href={s.href}
-                        onClick={(e) => e.stopPropagation()}
                         style={{ top, height }}
-                        className={`absolute inset-x-0.5 z-10 overflow-hidden rounded-md px-1 py-0.5 text-[9px] text-ink hover:brightness-[0.97] ${s.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+                        className="absolute inset-x-0.5 z-10"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="font-mono tabular-nums leading-tight">
-                          {startDate.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
-                        </div>
-                        {s.title ? <div className="truncate leading-tight text-[8px] text-muted">{s.title}</div> : null}
-                        <div className="truncate leading-tight">{s.patient}</div>
-                      </Link>
+                        <DraggableSession session={s} />
+                      </div>
                     );
                   })}
-                </div>
+                </DroppableDay>
               </div>
             );
           })}
@@ -198,7 +569,7 @@ function WeekBoard({
                   });
                   setSlotPicker(null);
                 }}
-                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink hover:bg-accent-soft transition-colors"
+                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink transition-colors hover:bg-accent-soft"
               >
                 <span className="text-xl">🗓</span>
                 טיפול
@@ -209,7 +580,7 @@ function WeekBoard({
                   // הדרכה — stub, עמוד בפיתוח
                   setSlotPicker(null);
                 }}
-                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink hover:bg-blue-50 transition-colors"
+                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink transition-colors hover:bg-blue-50"
               >
                 <span className="text-xl">📚</span>
                 הדרכה
@@ -220,7 +591,7 @@ function WeekBoard({
                   openAction("task", { date: toDateInput(slotPicker.date) });
                   setSlotPicker(null);
                 }}
-                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink hover:bg-accent-soft transition-colors"
+                className="flex flex-col items-center gap-1 rounded-xl border border-black/10 p-3 text-xs text-ink transition-colors hover:bg-accent-soft"
               >
                 <span className="text-xl">✅</span>
                 משימה
@@ -241,16 +612,19 @@ function WeekBoard({
 }
 
 function MonthBoard({
+  anchor,
   sessions,
   tasks,
+  today,
   onOpenDayTasks,
 }: {
+  anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
+  today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
 }) {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const firstWeekStart = startOfWeek(monthStart);
 
   const cells = Array.from({ length: 42 }).map((_, i) => {
@@ -260,40 +634,54 @@ function MonthBoard({
   });
 
   return (
-    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
-      {cells.map((d) => {
-        const daySessions = sessions.filter((s) => sameDay(new Date(s.startIso), d));
-        const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), d));
-        const inMonth = d.getMonth() === now.getMonth();
+    <>
+      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
+        {cells.map((d) => {
+          const dateKey = toDateKey(d);
+          const daySessions = sessions.filter((s) => sameDay(new Date(s.startIso), d));
+          const dayTasks = tasks.filter((t) => sameDay(new Date(t.dueIso), d));
+          const inMonth = d.getMonth() === anchor.getMonth();
+          const isToday = sameDay(d, today);
 
-        return (
-          <div key={d.toISOString()} className={`min-h-28 rounded-lg border p-2 ${inMonth ? "border-black/12" : "border-black/5 bg-black/[0.015]"}`}>
-            <div className="mb-1 font-mono text-muted">{d.getDate()}</div>
-            <div className="space-y-1">
-              {dayTasks.length ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onOpenDayTasks({
-                      dateLabel: d.toLocaleDateString("he-IL"),
-                      tasks: dayTasks,
-                    })
-                  }
-                  className="block w-full truncate rounded bg-app-bg px-1 py-0.5 text-[10px] text-ink transition hover:bg-accent-soft"
-                >
-                  {dayTasks.length} משימות
-                </button>
-              ) : null}
-              {daySessions.slice(0, 2).map((s) => (
-                <Link key={s.id} href={s.href} className={`block truncate rounded px-1 py-0.5 text-[10px] text-ink ${s.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}>
-                  {timeRangeLabel(new Date(s.startIso))} · {s.title ? `${s.title} · ` : ""}{s.patient}
-                </Link>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          const dayLabel = `יום ${HEB_DAYS_LONG[d.getDay()]} ${d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}`;
+
+          return (
+            <DroppableDay
+              key={dateKey}
+              dateKey={dateKey}
+              className={`min-h-28 rounded-lg border p-2 transition-colors ${
+                isToday
+                  ? "border-accent bg-accent-soft/20"
+                  : inMonth
+                  ? "border-black/12"
+                  : "border-black/5 bg-black/[0.015]"
+              }`}
+            >
+              <div className={`mb-1 text-[11px] font-medium ${isToday ? "text-accent" : inMonth ? "text-ink" : "text-muted"}`}>
+                {dayLabel}
+              </div>
+              <div className="space-y-1">
+                {dayTasks.length ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDayTasks({ dateLabel: d.toLocaleDateString("he-IL"), tasks: dayTasks })}
+                    className="block w-full truncate rounded bg-app-bg px-1 py-0.5 text-[10px] text-ink transition hover:bg-accent-soft"
+                  >
+                    {dayTasks.length} משימות
+                  </button>
+                ) : null}
+                {daySessions.slice(0, 2).map((s) => (
+                  <DraggableSessionCompact key={s.id} session={s} />
+                ))}
+                {daySessions.length > 2 && (
+                  <div className="text-[9px] text-muted">+{daySessions.length - 2} נוספות</div>
+                )}
+              </div>
+            </DroppableDay>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -303,15 +691,7 @@ function timeRangeLabel(start: Date) {
   return `${start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}-${end.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-function DayTasksModal({
-  dateLabel,
-  tasks,
-  onClose,
-}: {
-  dateLabel: string;
-  tasks: CalendarTask[];
-  onClose: () => void;
-}) {
+function DayTasksModal({ dateLabel, tasks, onClose }: { dateLabel: string; tasks: CalendarTask[]; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-[min(90vw,560px)] rounded-2xl border border-black/10 bg-white p-4 shadow-2xl">
@@ -342,14 +722,18 @@ function ModeButton({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
-function inRange(date: Date, now: Date, mode: ViewMode) {
-  if (mode === "week") {
-    const start = startOfWeek(now);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 7);
-    return date >= start && date < end;
-  }
-  return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+// Fix: use local date parts to avoid UTC off-by-one in Israel (UTC+2)
+function toDateKey(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toDateInput(date: Date) {
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60000);
+  return local.toISOString().slice(0, 10);
 }
 
 function sameDay(a: Date, b: Date) {
@@ -358,15 +742,7 @@ function sameDay(a: Date, b: Date) {
 
 function startOfWeek(date: Date) {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() - d.getDay()); // ראשון = 0
   d.setHours(0, 0, 0, 0);
   return d;
-}
-
-function toDateInput(date: Date) {
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 10);
 }

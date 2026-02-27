@@ -43,6 +43,7 @@ export function ResearchWorkspace({
   const [kind, setKind] = useState(initialFilters.kind);
   const [topic, setTopic] = useState(initialFilters.topic);
   const [author, setAuthor] = useState(initialFilters.author);
+  const [linkedOnly, setLinkedOnly] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
 
   const topicOptions = useMemo(
@@ -59,12 +60,12 @@ export function ResearchWorkspace({
       if (kind !== "ALL" && doc.kind !== kind) return false;
       if (topic !== "ALL" && !doc.topics.includes(topic)) return false;
       if (author !== "ALL" && !doc.authors.includes(author)) return false;
+      if (linkedOnly && doc.linkedPatients.length === 0) return false;
       const text = `${doc.title} ${doc.source ?? ""} ${doc.authors.join(" ")} ${doc.topics.join(" ")}`.toLowerCase();
       return text.includes(q.trim().toLowerCase());
     });
-  }, [docs, q, kind, topic, author]);
+  }, [docs, q, kind, topic, author, linkedOnly]);
 
-  
   useEffect(() => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -74,6 +75,7 @@ export function ResearchWorkspace({
     const next = params.toString();
     router.replace(next ? `?${next}` : "", { scroll: false });
   }, [q, kind, topic, author, router]);
+
   const stats = useMemo(() => {
     const byKind = docs.reduce<Record<string, number>>((acc, doc) => {
       acc[doc.kind] = (acc[doc.kind] ?? 0) + 1;
@@ -88,6 +90,10 @@ export function ResearchWorkspace({
     };
   }, [docs]);
 
+  function toggleKind(k: string) {
+    setKind((prev) => (prev === k ? "ALL" : k));
+  }
+
   return (
     <main className="space-y-3">
       <section className="app-section">
@@ -99,11 +105,36 @@ export function ResearchWorkspace({
         </div>
 
         <div className="grid gap-2 md:grid-cols-5">
-          <Stat label="סה״כ מקורות" value={stats.total} />
-          <Stat label="מאמרים" value={stats.articles} />
-          <Stat label="ספרים" value={stats.books} />
-          <Stat label="וידאו" value={stats.videos} />
-          <Stat label="מקושרים למטופלים" value={stats.linked} />
+          <Stat
+            label="סה״כ מקורות"
+            value={stats.total}
+            active={kind === "ALL" && !linkedOnly}
+            onClick={() => { setKind("ALL"); setLinkedOnly(false); }}
+          />
+          <Stat
+            label="מאמרים"
+            value={stats.articles}
+            active={kind === "ARTICLE"}
+            onClick={() => { toggleKind("ARTICLE"); setLinkedOnly(false); }}
+          />
+          <Stat
+            label="ספרים"
+            value={stats.books}
+            active={kind === "BOOK"}
+            onClick={() => { toggleKind("BOOK"); setLinkedOnly(false); }}
+          />
+          <Stat
+            label="וידאו"
+            value={stats.videos}
+            active={kind === "VIDEO"}
+            onClick={() => { toggleKind("VIDEO"); setLinkedOnly(false); }}
+          />
+          <Stat
+            label="מקושרים למטופלים"
+            value={stats.linked}
+            active={linkedOnly}
+            onClick={() => { setLinkedOnly((v) => !v); setKind("ALL"); }}
+          />
         </div>
       </section>
 
@@ -181,12 +212,26 @@ export function ResearchWorkspace({
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  label,
+  value,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const base = "rounded-xl border px-3 py-2 text-start transition-colors";
+  const activeClass = "border-accent bg-accent-soft";
+  const idleClass = "border-black/14 bg-white/95 hover:bg-accent-soft/40 cursor-pointer";
+
   return (
-    <div className="rounded-xl border border-black/14 bg-white/95 px-3 py-2">
+    <button onClick={onClick} className={`${base} ${active ? activeClass : idleClass}`}>
       <div className="text-xs text-muted">{label}</div>
       <div className="text-xl font-semibold text-ink tabular-nums">{value}</div>
-    </div>
+    </button>
   );
 }
 
