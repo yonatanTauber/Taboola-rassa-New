@@ -65,12 +65,12 @@ export function PatientProfileEditor({
       return;
     }
 
-    // Check if fixedSessionDay or fixedSessionTime changed and trigger auto-generation
-    const fixedSessionDayChanged = form.fixedSessionDay !== initial.fixedSessionDay;
-    const fixedSessionTimeChanged = form.fixedSessionTime !== initial.fixedSessionTime;
+    // Always trigger auto-generation when a valid schedule exists.
+    // generateUpcomingSessions is idempotent — it avoids duplicates, so calling it
+    // even when the schedule didn't change just fills in any missing future sessions.
     const hasValidSchedule = form.fixedSessionDay !== "" && form.fixedSessionTime !== "";
 
-    if ((fixedSessionDayChanged || fixedSessionTimeChanged) && hasValidSchedule) {
+    if (hasValidSchedule) {
       try {
         await fetch("/api/sessions/recurring", {
           method: "POST",
@@ -78,12 +78,12 @@ export function PatientProfileEditor({
           body: JSON.stringify({ patientId }),
         });
         showToast({
-          message: "פרטי המטופל נשמרו וטיפולים קבועים נוצרו",
+          message: "פרטי המטופל נשמרו וטיפולים קבועים עודכנו",
           durationMs: 4000,
         });
       } catch (error) {
         console.error("Error generating recurring sessions:", error);
-        showToast({ message: "פרטי המטופל נשמרו אך הטיפולים לא נוצרו" });
+        showToast({ message: "פרטי המטופל נשמרו אך הטיפולים לא עודכנו" });
       }
     } else {
       showToast({ message: "פרטי המטופל נשמרו בהצלחה" });
