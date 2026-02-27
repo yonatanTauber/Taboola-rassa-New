@@ -475,8 +475,7 @@ function WeekBoard({
   return (
     <>
       {/* Time range selector */}
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">יומן</h2>
+      <div className="mb-3 flex items-center justify-end">
         <TimeRangeSelector
           startHour={startHour}
           endHour={endHour}
@@ -520,9 +519,9 @@ function WeekBoard({
                     <button
                       type="button"
                       onClick={() => onOpenDayTasks({ dateLabel: day.toLocaleDateString("he-IL"), tasks: dayTasks })}
-                      className="ms-0.5 rounded-full bg-amber-100 px-1 text-[9px] text-amber-700 hover:bg-amber-200"
+                      className="ms-0.5 rounded-full bg-red-200 px-2 py-0.5 text-[11px] font-semibold text-red-900 hover:bg-red-300"
                     >
-                      {dayTasks.length}✓
+                      {dayTasks.length} משימות
                     </button>
                   )}
                 </div>
@@ -687,9 +686,9 @@ function MonthBoard({
                   <button
                     type="button"
                     onClick={() => onOpenDayTasks({ dateLabel: d.toLocaleDateString("he-IL"), tasks: dayTasks })}
-                    className="block w-full truncate rounded bg-app-bg px-1 py-0.5 text-[10px] text-ink transition hover:bg-accent-soft"
+                    className="block w-full truncate rounded bg-red-200 px-2 py-1 text-[11px] font-semibold text-red-900 transition hover:bg-red-300"
                   >
-                    {dayTasks.length} משימות
+                    📋 {dayTasks.length} משימות
                   </button>
                 ) : null}
                 {daySessions.slice(0, 2).map((s) => (

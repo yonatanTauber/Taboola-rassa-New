@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { EntityLink } from "@/components/EntityLink";
@@ -68,6 +69,20 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
       </section>
 
       <section className="rounded-2xl border border-black/10 bg-white p-4">
+        <div className="mb-3 flex gap-2">
+          <Link
+            href={`/tasks/new?sessionId=${session.id}`}
+            className="app-btn app-btn-primary text-xs"
+          >
+            + משימה
+          </Link>
+          <Link
+            href={`/patients/${session.patient.id}/guidance?sessionId=${session.id}`}
+            className="app-btn app-btn-secondary text-xs"
+          >
+            + הדרכה
+          </Link>
+        </div>
         <h2 className="mb-2 text-lg font-semibold">משימות קשורות</h2>
         <ul className="space-y-2 text-sm">
           {session.tasks.map((t) => (

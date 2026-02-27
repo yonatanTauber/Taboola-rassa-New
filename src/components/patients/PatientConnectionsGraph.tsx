@@ -167,8 +167,8 @@ export function PatientConnectionsGraph({
     <section className={`patient-graph-shell rounded-2xl border p-3 ${palette.shell}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">רשת קישורים סינפטית</h3>
-          <p className="text-xs text-muted">גרף קשרים מהיר לניווט בין ישויות הקשורות למטופל</p>
+          <h3 className={`text-sm font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-ink'}`}>רשת קישורים סינפטית</h3>
+          <p className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-muted'}`}>גרף קשרים מהיר לניווט בין ישויות הקשורות למטופל</p>
         </div>
         <div className="flex items-center gap-2">
           {openGraphHref ? (

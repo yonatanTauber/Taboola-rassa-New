@@ -20,14 +20,17 @@ export function FixedSessionPicker({
   dayInputName = "fixedSessionDay",
   hourInputName = "fixedSessionHour",
   minuteInputName = "fixedSessionMinute",
+  durationInputName = "fixedSessionDuration",
 }: {
   dayInputName?: string;
   hourInputName?: string;
   minuteInputName?: string;
+  durationInputName?: string;
 }) {
   const [day, setDay] = useState("");
   const [hour, setHour] = useState("");
   const [minute, setMinute] = useState("");
+  const [duration, setDuration] = useState("50");
 
   const hasDay = day !== "";
   const dayLabel = useMemo(() => DAY_OPTIONS.find((item) => item.value === day)?.label ?? "ללא יום קבוע", [day]);
@@ -37,8 +40,9 @@ export function FixedSessionPicker({
       <input type="hidden" name={dayInputName} value={day} />
       <input type="hidden" name={hourInputName} value={hasDay ? hour : ""} />
       <input type="hidden" name={minuteInputName} value={hasDay ? minute : ""} />
+      <input type="hidden" name={durationInputName} value={duration} />
 
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <label className="space-y-1">
           <span className="text-xs text-muted">יום קבוע</span>
           <select
@@ -62,7 +66,7 @@ export function FixedSessionPicker({
         </label>
 
         <label className="space-y-1">
-          <span className="text-xs text-muted">שעה</span>
+          <span className="text-xs text-muted">זמן התחלה - שעה</span>
           <select
             value={hour}
             onChange={(event) => setHour(event.target.value)}
@@ -80,7 +84,7 @@ export function FixedSessionPicker({
         </label>
 
         <label className="space-y-1">
-          <span className="text-xs text-muted">דקות</span>
+          <span className="text-xs text-muted">זמן התחלה - דקות</span>
           <select
             value={minute}
             onChange={(event) => setMinute(event.target.value)}
@@ -96,10 +100,26 @@ export function FixedSessionPicker({
             ))}
           </select>
         </label>
+
+        <label className="space-y-1">
+          <span className="text-xs text-muted">משך הפגישה (דקות)</span>
+          <input
+            type="number"
+            value={duration}
+            onChange={(event) => setDuration(event.target.value)}
+            min="15"
+            max="180"
+            step="5"
+            disabled={!hasDay}
+            className="app-input"
+            aria-label="משך הפגישה"
+            placeholder="50"
+          />
+        </label>
       </div>
 
       <p className="mt-2 text-xs text-muted">
-        {hasDay ? `יום קבוע: ${dayLabel}${hour && minute ? ` · ${hour}:${minute}` : ""}` : "לא נקבע יום ושעה קבועים"}
+        {hasDay ? `יום קבוע: ${dayLabel}${hour && minute ? ` · התחלה ${hour}:${minute} · משך ${duration}דק׳` : ""}` : "לא נקבע יום ושעה קבועים"}
       </p>
     </div>
   );
