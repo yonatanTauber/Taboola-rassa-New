@@ -2,9 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { FixedSessionPicker } from "@/components/patients/FixedSessionPicker";
-import { getCurrentUser, requireCurrentUserId } from "@/lib/auth-server";
+import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
@@ -74,14 +73,12 @@ async function createPatient(formData: FormData) {
   const hospitalizations = String(formData.get("hospitalizations") ?? "").trim();
   const freeText = String(formData.get("freeText") ?? "").trim();
 
-  if (!firstName || !lastName || !phone) {
+  if (!firstName || !lastName) {
     redirect("/patients/new?error=missing-required");
   }
 
   const parsedFixedDay = fixedSessionDay !== "" ? Number(fixedSessionDay) : null;
   const parsedFee = Number.isFinite(defaultSessionFeeNis) && defaultSessionFeeNis > 0 ? defaultSessionFeeNis : null;
-  const currentUser = await prisma.user.findUnique({ where: { id: userId }, select: { defaultSessionFeeNis: true } });
-  const effectiveDefaultFee = parsedFee ?? (currentUser?.defaultSessionFeeNis ?? null);
   const parsedDateOfBirth = dateOfBirth ? parseDateInput(dateOfBirth) : null;
   const parsedTreatmentStartDate = treatmentStartDateRaw
     ? parseDateInput(treatmentStartDateRaw)
@@ -123,14 +120,14 @@ async function createPatient(formData: FormData) {
         internalCode,
         firstName,
         lastName,
-        phone,
+        phone: phone || null,
         email: email || null,
         gender: gender === "MALE" || gender === "FEMALE" || gender === "OTHER" ? gender : "OTHER",
         researchAlias: `P-${Math.floor(Math.random() * 1_000_000)
           .toString()
           .padStart(6, "0")}`,
         avatarKey: AVATAR_KEYS[Math.floor(Math.random() * AVATAR_KEYS.length)],
-        defaultSessionFeeNis: effectiveDefaultFee,
+        defaultSessionFeeNis: parsedFee,
         dateOfBirth: parsedDateOfBirth,
         treatmentStartDate: parsedTreatmentStartDate ?? new Date(),
         fixedSessionDay: parsedFixedDay,
@@ -153,28 +150,18 @@ async function createPatient(formData: FormData) {
     }
   } catch (error) {
     console.error("createPatient failed", error);
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      redirect(`/patients/new?error=duplicate-name&first=${encodeURIComponent(firstName)}&last=${encodeURIComponent(lastName)}`);
-    }
     redirect("/patients/new?error=create-failed");
   }
 
   redirect(`/patients?saved=patient`);
 }
 
-function errorText(errorCode?: string, firstName?: string, lastName?: string) {
-  if (errorCode === "missing-required") return "יש להשלים שם פרטי, שם משפחה וטלפון.";
+function errorText(errorCode?: string) {
+  if (errorCode === "missing-required") return "יש להשלים שם פרטי ושם משפחה.";
   if (errorCode === "invalid-birth-date") return "תאריך הלידה שהוזן אינו תקין.";
   if (errorCode === "invalid-treatment-start-date") return "תאריך התחלת הטיפול אינו תקין.";
   if (errorCode === "invalid-fixed-day") return "יום קבוע לפגישה אינו תקין.";
   if (errorCode === "invalid-fixed-time") return "השעה הקבועה לפגישה אינה תקינה.";
-  if (errorCode === "duplicate-name") {
-    const name = [firstName, lastName].filter(Boolean).join(" ");
-    return `מטופל בשם "${name}" כבר קיים במערכת.`;
-  }
   if (errorCode === "create-failed") return "שמירת המטופל נכשלה. נסה שוב.";
   return null;
 }
@@ -182,13 +169,11 @@ function errorText(errorCode?: string, firstName?: string, lastName?: string) {
 export default async function NewPatientPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; first?: string; last?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const query = await searchParams;
-  const error = errorText(query.error, query.first, query.last);
-  const currentUser = await getCurrentUser();
+  const error = errorText(query.error);
   const defaultTreatmentStartDate = toDateInput(new Date());
-  const defaultFeeFromUser = currentUser?.defaultSessionFeeNis ? String(currentUser.defaultSessionFeeNis) : "";
   return (
     <main className="space-y-4">
       <BackButton fallback="/patients" />
@@ -208,13 +193,13 @@ export default async function NewPatientPage({
               <option value="FEMALE">אישה</option>
               <option value="OTHER">אחר</option>
             </select>
-            <input required name="phone" placeholder="טלפון ליצירת קשר *" className="app-field" />
+            <input name="phone" placeholder="טלפון ליצירת קשר (אופציונלי)" className="app-field" />
             <input name="email" placeholder="אימייל" className="app-field" />
             <label className="space-y-1">
               <div className="text-xs text-muted">תאריך לידה</div>
               <input name="dateOfBirth" type="date" lang="he-IL" className="app-field" />
             </label>
-            <div className="space-y-2 md:col-span-2 md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-start md:gap-3">
+            <div className="space-y-2 md:col-span-2 md:grid md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-start md:gap-2">
               <label className="space-y-1">
                 <div className="text-xs text-muted">תאריך התחלת טיפול</div>
                 <input
@@ -235,7 +220,6 @@ export default async function NewPatientPage({
               name="defaultSessionFeeNis"
               type="number"
               min="0"
-              defaultValue={defaultFeeFromUser}
               placeholder="מחיר טיפול קבוע (₪)"
               className="app-field"
             />
