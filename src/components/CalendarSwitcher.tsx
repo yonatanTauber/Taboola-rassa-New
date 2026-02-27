@@ -10,12 +10,8 @@ import { useQuickActions } from "@/components/QuickActions";
 
 const HEB_DAYS_LONG = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-// Hourly grid constants
+// Hourly grid constants (moved to state in WeekBoard for dynamic range)
 const HOUR_H = 56; // px per hour
-const START_HOUR = 8;
-const END_HOUR = 21;
-const HOUR_RANGE = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
-const GRID_H = HOUR_RANGE.length * HOUR_H;
 
 export type CalendarSession = {
   id: string;
@@ -455,16 +451,36 @@ function WeekBoard({
 }) {
   const { openAction } = useQuickActions();
   const [slotPicker, setSlotPicker] = useState<{ date: Date; hour: number } | null>(null);
+  const [startHour, setStartHour] = useState(8);
+  const [endHour, setEndHour] = useState(21);
+
+  // Compute hour range based on selected start/end hours
+  const HOUR_RANGE = Array.from(
+    { length: endHour - startHour },
+    (_, i) => startHour + i
+  );
+  const GRID_H = HOUR_RANGE.length * HOUR_H;
 
   const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }).map((_, idx) => {
     const d = new Date(start);
     d.setDate(start.getDate() + idx);
     return d;
-  });
+  }).reverse(); // RTL: reverse to Saturday-Sunday ordering
 
   return (
     <>
+      {/* Time range selector */}
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">יומן</h2>
+        <TimeRangeSelector
+          startHour={startHour}
+          endHour={endHour}
+          onStartChange={setStartHour}
+          onEndChange={setEndHour}
+        />
+      </div>
+
       <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "70vh" }}>
         <div dir="ltr" className="flex min-w-[600px]">
           {/* Time axis */}
@@ -522,7 +538,9 @@ function WeekBoard({
                   {/* Sessions positioned by start time */}
                   {daySessions.map((s) => {
                     const startDate = new Date(s.startIso);
-                    const minutesFromStart = (startDate.getHours() - START_HOUR) * 60 + startDate.getMinutes();
+                    // Hide sessions outside the selected time range
+                    if (startDate.getHours() < startHour || startDate.getHours() >= endHour) return null;
+                    const minutesFromStart = (startDate.getHours() - startHour) * 60 + startDate.getMinutes();
                     const top = (minutesFromStart / 60) * HOUR_H;
                     const height = Math.max(24, (50 / 60) * HOUR_H);
                     return (
@@ -682,6 +700,48 @@ function MonthBoard({
         })}
       </div>
     </>
+  );
+}
+
+function TimeRangeSelector({
+  startHour,
+  endHour,
+  onStartChange,
+  onEndChange,
+}: {
+  startHour: number;
+  endHour: number;
+  onStartChange: (h: number) => void;
+  onEndChange: (h: number) => void;
+}) {
+  const handleStartChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = parseInt(e.target.value);
+    if (v < endHour) onStartChange(v);
+  };
+  const handleEndChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = parseInt(e.target.value);
+    if (v > startHour) onEndChange(v);
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <label className="text-muted">שעות:</label>
+      <select value={startHour} onChange={handleStartChange} className="app-select px-2 py-1 text-sm">
+        {Array.from({ length: 24 }, (_, i) => (
+          <option key={i} value={i}>
+            {String(i).padStart(2, "0")}:00
+          </option>
+        ))}
+      </select>
+      <span className="text-muted">עד</span>
+      <select value={endHour} onChange={handleEndChange} className="app-select px-2 py-1 text-sm">
+        {Array.from({ length: 24 }, (_, i) => (
+          <option key={i} value={i}>
+            {String(i).padStart(2, "0")}:00
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
