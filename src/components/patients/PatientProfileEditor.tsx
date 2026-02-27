@@ -63,8 +63,31 @@ export function PatientProfileEditor({
       return;
     }
 
+    // Check if fixedSessionDay or fixedSessionTime changed and trigger auto-generation
+    const fixedSessionDayChanged = form.fixedSessionDay !== initial.fixedSessionDay;
+    const fixedSessionTimeChanged = form.fixedSessionTime !== initial.fixedSessionTime;
+    const hasValidSchedule = form.fixedSessionDay !== "" && form.fixedSessionTime !== "";
+
+    if ((fixedSessionDayChanged || fixedSessionTimeChanged) && hasValidSchedule) {
+      try {
+        await fetch("/api/sessions/recurring", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ patientId }),
+        });
+        showToast({
+          message: "פרטי המטופל נשמרו וטיפולים קבועים נוצרו",
+          durationMs: 4000,
+        });
+      } catch (error) {
+        console.error("Error generating recurring sessions:", error);
+        showToast({ message: "פרטי המטופל נשמרו אך הטיפולים לא נוצרו" });
+      }
+    } else {
+      showToast({ message: "פרטי המטופל נשמרו בהצלחה" });
+    }
+
     setEditing(false);
-    showToast({ message: "פרטי המטופל נשמרו בהצלחה" });
     router.refresh();
   }
 

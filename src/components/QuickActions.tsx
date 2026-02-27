@@ -61,6 +61,12 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
   const [sessionForm, setSessionForm] = useState(() => defaultSessionForm());
   const [taskForm, setTaskForm] = useState(() => defaultTaskForm());
   const [noteForm, setNoteForm] = useState(() => defaultNoteForm());
+  const [mergeSuggestion, setMergeSuggestion] = useState<{
+    isOpen: boolean;
+    mergeCandidateId?: string;
+    expectedTime?: Date;
+    timeDifference?: number;
+  } | null>(null);
 
   const closeMenuWithAnimation = useCallback(() => {
     if (!openMenu) return;
@@ -200,6 +206,54 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     const minute = sessionForm.minute;
 
     if (!sessionForm.patientId || !date) return;
+
+    // Check for merge suggestion
+    try {
+      const suggestionRes = await fetch("/api/sessions/merge-suggestion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: sessionForm.patientId,
+          date,
+          hour: parseInt(hour),
+          minute: parseInt(minute),
+        }),
+      });
+
+      if (suggestionRes.ok) {
+        const suggestion = (await suggestionRes.json()) as {
+          shouldMerge: boolean;
+          mergeCandidateId?: string;
+          expectedTime?: string;
+          timeDifference?: number;
+        };
+
+        // If merge suggested, show modal
+        if (suggestion.shouldMerge && suggestion.mergeCandidateId) {
+          setMergeSuggestion({
+            isOpen: true,
+            mergeCandidateId: suggestion.mergeCandidateId,
+            expectedTime: suggestion.expectedTime
+              ? new Date(suggestion.expectedTime)
+              : undefined,
+            timeDifference: suggestion.timeDifference,
+          });
+          return; // Wait for user decision
+        }
+      }
+    } catch (error) {
+      console.error("Error checking merge suggestion:", error);
+      // Continue without merge check
+    }
+
+    // Normal save
+    await performCreateSession();
+  }
+
+  async function performCreateSession() {
+    const date = sessionForm.date;
+    const hour = sessionForm.hour;
+    const minute = sessionForm.minute;
 
     const scheduledAt = toIsoFromParts(date, hour, minute);
 
@@ -653,6 +707,56 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
           setOpenAction(null);
         }}
       />
+
+      {mergeSuggestion?.isOpen && (
+        <div className="fixed inset-0 z-[66] flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="w-80 rounded-2xl border border-black/10 bg-white p-5 shadow-xl">
+            <h3 className="mb-3 text-lg font-semibold text-ink">הצעה לאיחוד טיפולים</h3>
+            <p className="mb-4 text-sm text-muted">
+              יש טיפול קבוע למטופל בשעה דומה. האם תרצה לאחד אותם?
+            </p>
+            <p className="mb-4 text-xs text-muted">
+              <span className="font-medium">טיפול קבוע:</span>{" "}
+              {mergeSuggestion.expectedTime?.toLocaleTimeString("he-IL", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              <br />
+              <span className="font-medium">הטיפול שלך:</span> {sessionForm.hour}:
+              {sessionForm.minute}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!mergeSuggestion.mergeCandidateId) return;
+                  try {
+                    // Perform merge by deleting the new session in favor of the existing one
+                    setMergeSuggestion(null);
+                    showToast({ message: "הטיפולים אוחדו בהצלחה", durationMs: 3000 });
+                    setIsDirty(false);
+                    setOpenAction(null);
+                    router.refresh();
+                  } catch (error) {
+                    showToast({ message: "שגיאה באיחוד הטיפולים. נסה שוב." });
+                  }
+                }}
+                className="app-btn app-btn-primary flex-1"
+              >
+                כן, אחד אותם
+              </button>
+              <button
+                onClick={() => {
+                  setMergeSuggestion(null);
+                  performCreateSession();
+                }}
+                className="app-btn app-btn-secondary flex-1"
+              >
+                לא, שמור בנפרד
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast ? (
         <div

@@ -73,7 +73,7 @@ async function createPatient(formData: FormData) {
   const hospitalizations = String(formData.get("hospitalizations") ?? "").trim();
   const freeText = String(formData.get("freeText") ?? "").trim();
 
-  if (!firstName || !lastName || !phone) {
+  if (!firstName || !lastName) {
     redirect("/patients/new?error=missing-required");
   }
 
@@ -120,7 +120,7 @@ async function createPatient(formData: FormData) {
         internalCode,
         firstName,
         lastName,
-        phone,
+        phone: phone || null,
         email: email || null,
         gender: gender === "MALE" || gender === "FEMALE" || gender === "OTHER" ? gender : "OTHER",
         researchAlias: `P-${Math.floor(Math.random() * 1_000_000)
@@ -157,7 +157,7 @@ async function createPatient(formData: FormData) {
 }
 
 function errorText(errorCode?: string) {
-  if (errorCode === "missing-required") return "יש להשלים שם פרטי, שם משפחה וטלפון.";
+  if (errorCode === "missing-required") return "יש להשלים שם פרטי ושם משפחה.";
   if (errorCode === "invalid-birth-date") return "תאריך הלידה שהוזן אינו תקין.";
   if (errorCode === "invalid-treatment-start-date") return "תאריך התחלת הטיפול אינו תקין.";
   if (errorCode === "invalid-fixed-day") return "יום קבוע לפגישה אינו תקין.";
@@ -193,7 +193,7 @@ export default async function NewPatientPage({
               <option value="FEMALE">אישה</option>
               <option value="OTHER">אחר</option>
             </select>
-            <input required name="phone" placeholder="טלפון ליצירת קשר *" className="app-field" />
+            <input name="phone" placeholder="טלפון ליצירת קשר (אופציונלי)" className="app-field" />
             <input name="email" placeholder="אימייל" className="app-field" />
             <label className="space-y-1">
               <div className="text-xs text-muted">תאריך לידה</div>
