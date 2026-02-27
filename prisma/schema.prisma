@@ -151,7 +151,7 @@ model Patient {
   lastName              String
   avatarKey             String?
   gender                Gender
-  phone                 String
+  phone                 String?
   email                 String?
   dateOfBirth           DateTime?
   treatmentStartDate    DateTime?
