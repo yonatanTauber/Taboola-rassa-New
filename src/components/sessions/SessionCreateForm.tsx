@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import { formatPatientName } from "@/lib/patient-name";
 
@@ -45,6 +45,22 @@ function getNextRecurringDate(fixedSessionDay: number, fixedSessionTime: string)
   };
 }
 
+function toDbFixedSessionDay(dateStr: string) {
+  const base = new Date(`${dateStr}T12:00:00`);
+  const jsDay = base.getDay(); // 0=Sun..6=Sat
+  return jsDay === 6 ? 0 : jsDay + 1;
+}
+
+function getFixedDateForWeek(dateStr: string, fixedSessionDay: number) {
+  const base = new Date(`${dateStr}T12:00:00`);
+  const currentDay = base.getDay(); // 0=Sun..6=Sat
+  const targetDay = ((fixedSessionDay - 1) + 7) % 7;
+  const diff = targetDay - currentDay;
+  const fixedDate = new Date(base);
+  fixedDate.setDate(base.getDate() + diff);
+  return fixedDate.toISOString().slice(0, 10);
+}
+
 type PatientOption = {
   id: string;
   firstName: string;
@@ -79,6 +95,10 @@ export function SessionCreateForm({
 }) {
   const [patientId, setPatientId] = useState(initialPatientId);
   const [dateValue, setDateValue] = useState(initialDate);
+  const [timeValue, setTimeValue] = useState(initialTime);
+  const [scheduleAction, setScheduleAction] = useState<"move_fixed" | "add_extra" | "use_fixed" | "">("");
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === patientId) ?? null,
@@ -103,16 +123,71 @@ export function SessionCreateForm({
     return getNextRecurringDate(selectedPatient.fixedSessionDay, selectedPatient.fixedSessionTime);
   }, [selectedPatient]);
 
+  const hasFixedSchedule = Boolean(selectedPatient?.fixedSessionDay && selectedPatient?.fixedSessionTime);
+  const isFixedSelection =
+    hasFixedSchedule &&
+    toDbFixedSessionDay(dateValue) === selectedPatient?.fixedSessionDay &&
+    timeValue === selectedPatient?.fixedSessionTime;
+
+  const handleDateChange = (next: string) => {
+    setDateValue(next);
+    setScheduleAction("");
+  };
+
+  const submitWithAction = (
+    nextAction: "move_fixed" | "add_extra" | "use_fixed",
+    overrides?: { date?: string; time?: string },
+  ) => {
+    const actionInput = formRef.current?.querySelector('input[name="scheduleAction"]') as HTMLInputElement | null;
+    if (actionInput) actionInput.value = nextAction;
+    setScheduleAction(nextAction);
+    setShowScheduleDialog(false);
+    setTimeout(() => {
+      if (overrides) {
+        const form = formRef.current;
+        const dateInput = form?.querySelector('input[name="date"]') as HTMLInputElement | null;
+        const timeInput = form?.querySelector('input[name="time"]') as HTMLInputElement | null;
+        if (overrides.date && dateInput) dateInput.value = overrides.date;
+        if (overrides.time && timeInput) timeInput.value = overrides.time;
+      }
+      formRef.current?.requestSubmit();
+    }, 0);
+  };
+
   return (
-    <form action={action} className="space-y-3">
+    <form
+      ref={formRef}
+      action={action}
+      className="space-y-3"
+      onSubmit={(event) => {
+        if (hasFixedSchedule && !isFixedSelection && !scheduleAction) {
+          event.preventDefault();
+          setShowScheduleDialog(true);
+        }
+      }}
+    >
       {error ? <div className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</div> : null}
+
+      <input type="hidden" name="scheduleAction" value={scheduleAction} />
 
       <label className="space-y-1">
         <div className="text-xs text-muted">מטופל</div>
         <select
           name="patientId"
           value={patientId}
-          onChange={(e) => setPatientId(e.target.value)}
+          onChange={(e) => {
+            setPatientId(e.target.value);
+            setScheduleAction("");
+            const nextPatient = patients.find((p) => p.id === e.target.value);
+            if (
+              nextPatient?.fixedSessionDay &&
+              nextPatient.fixedSessionTime &&
+              (toDbFixedSessionDay(dateValue) !== nextPatient.fixedSessionDay ||
+                timeValue !== nextPatient.fixedSessionTime)
+            ) {
+              setShowScheduleDialog(true);
+            }
+          }}
           className="app-select"
           required
         >
@@ -137,11 +212,7 @@ export function SessionCreateForm({
             type="button"
             onClick={() => {
               setDateValue(recurringSessionSuggestion.date);
-              // Also update the time input by finding it and setting value
-              const timeInput = document.querySelector('input[name="time"]') as HTMLInputElement;
-              if (timeInput) {
-                timeInput.value = recurringSessionSuggestion.time;
-              }
+              setTimeValue(recurringSessionSuggestion.time);
             }}
             className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
           >
@@ -174,7 +245,7 @@ export function SessionCreateForm({
         </div>
         <HebrewDateInput
           value={dateValue}
-          onChange={setDateValue}
+          onChange={handleDateChange}
           namePrefix="session-create-date"
           ariaLabelPrefix="תאריך פגישה"
         />
@@ -183,7 +254,18 @@ export function SessionCreateForm({
 
       <label className="space-y-1">
         <div className="text-xs text-muted">שעת המפגש</div>
-        <input type="time" name="time" step={300} defaultValue={initialTime} className="app-field max-w-44" required />
+        <input
+          type="time"
+          name="time"
+          step={300}
+          value={timeValue}
+          onChange={(e) => {
+            setTimeValue(e.target.value);
+            setScheduleAction("");
+          }}
+          className="app-field max-w-44"
+          required
+        />
       </label>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -215,6 +297,62 @@ export function SessionCreateForm({
         <Link href={patientId ? `/patients/${patientId}` : "/sessions"} className="app-btn app-btn-secondary">ביטול</Link>
         <button type="submit" className="app-btn app-btn-primary">אישור</button>
       </div>
+
+      {showScheduleDialog && hasFixedSchedule && selectedPatient?.fixedSessionDay && selectedPatient?.fixedSessionTime ? (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/30 px-3 backdrop-blur-sm">
+          <div className="w-[min(92vw,520px)] rounded-2xl border border-black/10 bg-white p-4 shadow-2xl">
+            <div className="mb-2 text-lg font-semibold text-ink">לפני יצירת פגישה</div>
+            <p className="text-sm text-muted">
+              למטופל יש פגישה קבועה. בחר/י איך להתייחס לתאריך שבחרת.
+            </p>
+            <div className="mt-3 space-y-2 text-sm">
+              <button
+                type="button"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-start transition hover:bg-accent-soft"
+                onClick={() => {
+                  submitWithAction("move_fixed");
+                }}
+              >
+                קביעת הטיפול הנוכחי במקום הטיפול הקבוע
+                <span className="block text-xs text-muted">הקבוע יתעדכן לזמן שבחרת</span>
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-start transition hover:bg-accent-soft"
+                onClick={() => {
+                  const fixedDate = getFixedDateForWeek(dateValue, selectedPatient.fixedSessionDay!);
+                  setDateValue(fixedDate);
+                  const fixedTime = selectedPatient.fixedSessionTime ?? timeValue;
+                  setTimeValue(fixedTime);
+                  submitWithAction("use_fixed", { date: fixedDate, time: fixedTime });
+                }}
+              >
+                הזנה עם נתוני הטיפול הקבוע
+                <span className="block text-xs text-muted">הפגישה תיכנס ביום/שעה הקבועים</span>
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-start transition hover:bg-accent-soft"
+                onClick={() => {
+                  submitWithAction("add_extra");
+                }}
+              >
+                פגישה נוספת למטופל
+                <span className="block text-xs text-muted">הקבוע נשאר כמו שהוא</span>
+              </button>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowScheduleDialog(false)}
+                className="app-btn app-btn-secondary"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }

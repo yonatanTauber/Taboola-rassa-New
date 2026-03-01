@@ -11,7 +11,7 @@ import { useQuickActions } from "@/components/QuickActions";
 const HEB_DAYS_LONG = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 // Hourly grid constants (moved to state in WeekBoard for dynamic range)
-const HOUR_H = 56; // px per hour
+const HOUR_H = 50; // px per hour
 
 export type CalendarSession = {
   id: string;
@@ -78,9 +78,11 @@ export function CalendarSwitcher({
   // Fetch data whenever the range changes
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     const from = rangeStart.toISOString();
     const to = rangeEnd.toISOString();
+    setTimeout(() => {
+      if (!cancelled) setLoading(true);
+    }, 0);
     fetch(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
       .then((r) => r.json())
       .then((data) => {
@@ -91,7 +93,7 @@ export function CalendarSwitcher({
       .catch(() => {/* silent – keep old data */})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [rangeStart.toISOString(), rangeEnd.toISOString()]);
+  }, [rangeStart, rangeEnd]);
 
   const visibleSessions = useMemo(
     () => sessions.filter((s) => {
@@ -423,23 +425,6 @@ function DraggableSessionCompact({ session }: { session: CalendarSession }) {
   );
 }
 
-function DraggableTask({ task, onOpen }: { task: CalendarTask; onOpen: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `task:${task.id}` });
-  const style = transform ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.3 : 1 } : undefined;
-
-  return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
-      <button
-        type="button"
-        onClick={() => { if (!isDragging) onOpen(); }}
-        className="w-full rounded bg-white px-2 py-1 text-[10px] text-ink transition hover:bg-accent-soft cursor-grab active:cursor-grabbing"
-      >
-        {task.title.length > 20 ? task.title.slice(0, 20) + "…" : task.title}
-      </button>
-    </div>
-  );
-}
-
 function WeekBoard({
   anchor,
   sessions,
@@ -456,7 +441,7 @@ function WeekBoard({
   const { openAction } = useQuickActions();
   const [slotPicker, setSlotPicker] = useState<{ date: Date; hour: number } | null>(null);
   const [startHour, setStartHour] = useState(8);
-  const [endHour, setEndHour] = useState(21);
+  const [endHour, setEndHour] = useState(20);
 
   // Compute hour range based on selected start/end hours
   const HOUR_RANGE = Array.from(
@@ -484,7 +469,7 @@ function WeekBoard({
         />
       </div>
 
-      <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "70vh" }}>
+      <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "62vh" }}>
         <div dir="ltr" className="flex min-w-[600px]">
           {/* Time axis */}
           <div className="w-11 flex-shrink-0 border-e border-black/8 bg-white">

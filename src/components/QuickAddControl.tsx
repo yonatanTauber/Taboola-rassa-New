@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, type TouchEvent } from "react";
+import { useRef } from "react";
 import { useQuickActions } from "@/components/QuickActions";
 
 export function QuickAddControl() {
@@ -16,8 +16,7 @@ export function QuickAddControl() {
 
   const menuVisible = openMenu || menuAnimatingOut;
 
-  function handleToggleFromTouch(event: TouchEvent<HTMLButtonElement>) {
-    event.preventDefault();
+  function handleToggleFromTouch() {
     touchTriggeredAtRef.current = Date.now();
     toggleMenu();
   }
@@ -78,11 +77,11 @@ export function QuickAddControl() {
                   פנייה חדשה
                 </Link>
                 <Link
-                  href="/research"
+                  href="/research?upload=1"
                   onClick={() => closeMenuWithAnimation()}
                   className="app-btn app-btn-secondary w-full text-xs"
                 >
-                  מאמר
+                  מקור חדש
                 </Link>
                 <Link
                   href="/receipts/new"
@@ -101,17 +100,26 @@ export function QuickAddControl() {
             <BubbleMenuLink index={2} label="מטופל חדש" visible={!menuAnimatingOut} href="/patients/new" onClick={closeMenuWithAnimation} />
             <BubbleMenuLink index={3} label="פנייה חדשה" visible={!menuAnimatingOut} href="/inquiries" onClick={closeMenuWithAnimation} />
             <BubbleMenuAction index={4} label="פתק חופשי" visible={!menuAnimatingOut} onClick={() => openAction("note")} />
-            <BubbleMenuLink index={5} label="מאמר" visible={!menuAnimatingOut} href="/research" onClick={closeMenuWithAnimation} />
+            <BubbleMenuLink index={5} label="מקור חדש" visible={!menuAnimatingOut} href="/research?upload=1" onClick={closeMenuWithAnimation} />
             <BubbleMenuLink index={6} label="קבלה" visible={!menuAnimatingOut} href="/receipts/new" onClick={closeMenuWithAnimation} />
           </div>
         </>
       ) : null}
       <button
         type="button"
-        onClick={handleToggleFromClick}
-        onTouchEnd={handleToggleFromTouch}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleToggleFromClick();
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleToggleFromTouch();
+        }}
         className="size-10 rounded-full border border-accent/25 bg-accent text-[1.5rem] leading-none text-white shadow-[0_10px_22px_rgba(35,85,168,0.30)] transition hover:brightness-95"
         aria-label="פתיחת תפריט הוספה"
+        style={{ touchAction: "manipulation" }}
       >
         +
       </button>

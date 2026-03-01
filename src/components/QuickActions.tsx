@@ -40,10 +40,28 @@ type PatientOption = {
   id: string;
   name: string;
   defaultSessionFeeNis?: number | null;
+  fixedSessionDay?: number | null;
+  fixedSessionTime?: string | null;
 };
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
+
+function toDbFixedSessionDay(dateStr: string) {
+  const base = new Date(`${dateStr}T12:00:00`);
+  const jsDay = base.getDay(); // 0=Sun..6=Sat
+  return jsDay === 6 ? 0 : jsDay + 1;
+}
+
+function getFixedDateForWeek(dateStr: string, fixedSessionDay: number) {
+  const base = new Date(`${dateStr}T12:00:00`);
+  const currentDay = base.getDay();
+  const targetDay = ((fixedSessionDay - 1) + 7) % 7;
+  const diff = targetDay - currentDay;
+  const fixedDate = new Date(base);
+  fixedDate.setDate(base.getDate() + diff);
+  return fixedDate.toISOString().slice(0, 10);
+}
 
 const QuickActionsContext = createContext<QuickActionsContextValue | null>(null);
 
@@ -67,6 +85,8 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     expectedTime?: Date;
     timeDifference?: number;
   } | null>(null);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleAction, setScheduleAction] = useState<"" | "move_fixed" | "add_extra" | "use_fixed">("");
 
   const closeMenuWithAnimation = useCallback(() => {
     if (!openMenu) return;
@@ -88,6 +108,11 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
       .catch((err) => { if (err !== 20) console.error("[QuickActions] patients/options:", err); });
     return () => controller.abort();
   }, []);
+
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p.id === sessionForm.patientId) ?? null,
+    [patients, sessionForm.patientId],
+  );
 
 
 
@@ -208,6 +233,17 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
 
     if (!sessionForm.patientId || !date) return;
 
+    const hasFixedSchedule = Boolean(selectedPatient?.fixedSessionDay && selectedPatient?.fixedSessionTime);
+    const isFixedSelection =
+      hasFixedSchedule &&
+      toDbFixedSessionDay(date) === selectedPatient?.fixedSessionDay &&
+      `${hour}:${minute}` === selectedPatient?.fixedSessionTime;
+
+    if (hasFixedSchedule && !isFixedSelection && !scheduleAction) {
+      setScheduleDialogOpen(true);
+      return;
+    }
+
     // Check for merge suggestion
     try {
       const suggestionRes = await fetch("/api/sessions/merge-suggestion", {
@@ -242,8 +278,8 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
           return; // Wait for user decision
         }
       }
-    } catch (error) {
-      console.error("Error checking merge suggestion:", error);
+    } catch {
+      console.error("Error checking merge suggestion");
       // Continue without merge check
     }
 
@@ -251,11 +287,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     await performCreateSession();
   }
 
-  async function performCreateSession() {
-    const date = sessionForm.date;
-    const hour = sessionForm.hour;
-    const minute = sessionForm.minute;
-
+  async function performCreateSessionWithParts(date: string, hour: string, minute: string, action: typeof scheduleAction) {
     const scheduledAt = toIsoFromParts(date, hour, minute);
 
     const payload = {
@@ -264,6 +296,9 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
       feeNis: sessionForm.feeNis,
       location: sessionForm.location,
       note: sessionForm.note,
+      scheduleAction: action,
+      fixedSessionDay: action === "move_fixed" ? toDbFixedSessionDay(date) : null,
+      fixedSessionTime: action === "move_fixed" ? `${hour}:${minute}` : null,
     };
 
     const res = await fetch("/api/sessions", {
@@ -279,6 +314,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     const data = (await res.json()) as { sessionId: string };
 
     setIsDirty(false);
+    setScheduleAction("");
     setOpenAction(null);
     router.push("/");
     showToast({
@@ -290,6 +326,13 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
         router.refresh();
       },
     });
+  }
+
+  async function performCreateSession() {
+    const date = sessionForm.date;
+    const hour = sessionForm.hour;
+    const minute = sessionForm.minute;
+    await performCreateSessionWithParts(date, hour, minute, scheduleAction);
   }
 
   async function createTask(e: FormEvent<HTMLFormElement>) {
@@ -387,6 +430,15 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                   patientId,
                   feeNis: selected?.defaultSessionFeeNis ? String(selected.defaultSessionFeeNis) : prev.feeNis,
                 }));
+                setScheduleAction("");
+                if (
+                  selected?.fixedSessionDay &&
+                  selected.fixedSessionTime &&
+                  (toDbFixedSessionDay(sessionForm.date) !== selected.fixedSessionDay ||
+                    `${sessionForm.hour}:${sessionForm.minute}` !== selected.fixedSessionTime)
+                ) {
+                  setScheduleDialogOpen(true);
+                }
                 setIsDirty(true);
               }}
               className="app-select"
@@ -409,6 +461,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                 value={sessionForm.date}
                 onChange={(next) => {
                   setSessionForm((prev) => ({ ...prev, date: next }));
+                  setScheduleAction("");
                   setIsDirty(true);
                 }}
               />
@@ -434,6 +487,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                 name="sessionMinute" autoComplete="off" value={sessionForm.minute}
                 onChange={(e) => {
                   setSessionForm((prev) => ({ ...prev, minute: e.target.value }));
+                  setScheduleAction("");
                   setIsDirty(true);
                 }}
                 className="app-select app-time-select"
@@ -450,6 +504,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                 name="sessionHour" autoComplete="off" value={sessionForm.hour}
                 onChange={(e) => {
                   setSessionForm((prev) => ({ ...prev, hour: e.target.value }));
+                  setScheduleAction("");
                   setIsDirty(true);
                 }}
                 className="app-select app-time-select"
@@ -737,7 +792,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                     setIsDirty(false);
                     setOpenAction(null);
                     router.refresh();
-                  } catch (error) {
+                  } catch {
                     showToast({ message: "שגיאה באיחוד הטיפולים. נסה שוב." });
                   }
                 }}
@@ -759,9 +814,64 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {scheduleDialogOpen && selectedPatient?.fixedSessionDay && selectedPatient?.fixedSessionTime ? (
+        <div className="fixed inset-0 z-[67] flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="w-[min(92vw,520px)] rounded-2xl border border-black/10 bg-white p-5 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-ink">לפני יצירת פגישה</h3>
+            <p className="mb-4 text-sm text-muted">למטופל יש פגישה קבועה. בחר/י איך להתייחס לתאריך שבחרת.</p>
+            <div className="space-y-2 text-sm">
+              <button
+                type="button"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-start transition hover:bg-accent-soft"
+                onClick={async () => {
+                  setScheduleAction("move_fixed");
+                  setScheduleDialogOpen(false);
+                  await performCreateSessionWithParts(sessionForm.date, sessionForm.hour, sessionForm.minute, "move_fixed");
+                }}
+              >
+                קביעת הטיפול הנוכחי במקום הטיפול הקבוע
+                <span className="block text-xs text-muted">הקבוע יתעדכן לזמן שבחרת</span>
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-start transition hover:bg-accent-soft"
+                onClick={async () => {
+                  const fixedDate = getFixedDateForWeek(sessionForm.date, selectedPatient.fixedSessionDay!);
+                  const [fixedHour, fixedMinute] = selectedPatient.fixedSessionTime!.split(":");
+                  setSessionForm((prev) => ({ ...prev, date: fixedDate, hour: fixedHour, minute: fixedMinute }));
+                  setScheduleAction("use_fixed");
+                  setScheduleDialogOpen(false);
+                  await performCreateSessionWithParts(fixedDate, fixedHour, fixedMinute, "use_fixed");
+                }}
+              >
+                הזנה עם נתוני הטיפול הקבוע
+                <span className="block text-xs text-muted">הפגישה תיכנס ביום/שעה הקבועים</span>
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-start transition hover:bg-accent-soft"
+                onClick={async () => {
+                  setScheduleAction("add_extra");
+                  setScheduleDialogOpen(false);
+                  await performCreateSessionWithParts(sessionForm.date, sessionForm.hour, sessionForm.minute, "add_extra");
+                }}
+              >
+                פגישה נוספת למטופל
+                <span className="block text-xs text-muted">הקבוע נשאר כמו שהוא</span>
+              </button>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button type="button" onClick={() => setScheduleDialogOpen(false)} className="app-btn app-btn-secondary">
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {toast ? (
         <div
-          className="fixed z-[70] min-w-72 rounded-xl border border-accent/25 bg-white px-4 py-3 shadow-xl" aria-live="polite" role="status"
+          className="fixed z-[160] min-w-72 rounded-xl border border-accent/25 bg-white px-4 py-3 shadow-xl" aria-live="polite" role="status"
           style={toastStyle}
         >
           <div className="text-sm text-ink">{toast.message}</div>

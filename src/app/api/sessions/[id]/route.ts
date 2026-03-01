@@ -17,17 +17,21 @@ export async function PATCH(
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const normalizedFee =
+    body.status === "CANCELED"
+      ? 0
+      : body.feeNis === ""
+        ? null
+        : typeof body.feeNis === "number"
+          ? body.feeNis
+          : undefined;
+
   const updated = await prisma.session.update({
     where: { id },
     data: {
       status: typeof body.status === "string" ? body.status : undefined,
       location: body.location === "" ? null : typeof body.location === "string" ? body.location : undefined,
-      feeNis:
-        body.feeNis === ""
-          ? null
-          : typeof body.feeNis === "number"
-            ? body.feeNis
-            : undefined,
+      feeNis: normalizedFee,
       scheduledAt: typeof body.scheduledAt === "string" ? new Date(body.scheduledAt) : undefined,
     },
     include: { sessionNote: true },

@@ -517,8 +517,7 @@ function resolveNextSession(day: number | null, time: string | null, sessions: A
 
   // Compute Israel UTC offset at "now" (in minutes, positive = ahead of UTC)
   // by comparing UTC interpretation of an IL-date-string vs actual UTC
-  const ilDateStr = `${ilYear}-${String(ilMonth).padStart(2, "0")}-${String(ilDay).padStart(2, "0")}`;
-  const utcMidnightMs = Date.UTC(ilYear, ilMonth - 1, ilDay); // midnight UTC of IL calendar date
+  // Keep dates in IL calendar for offset calculation
   // IL midnight as UTC: parse "YYYY-MM-DDT00:00:00Z" vs the actual UTC at IL midnight
   // Easier: offset = UTC timestamp when IL shows hh:mm minus UTC timestamp of same hh:mm read as UTC
   const ilNowAsIfUTC = Date.UTC(ilYear, ilMonth - 1, ilDay, ilHour, ilMinute);

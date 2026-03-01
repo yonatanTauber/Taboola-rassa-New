@@ -12,13 +12,16 @@ export async function POST(req: Request) {
   const location = String(body.location ?? "").trim();
   const feeNis = Number(body.feeNis ?? 0);
   const note = String(body.note ?? "").trim();
+  const scheduleAction = String(body.scheduleAction ?? "").trim();
+  const fixedSessionDay = typeof body.fixedSessionDay === "number" ? body.fixedSessionDay : null;
+  const fixedSessionTime = typeof body.fixedSessionTime === "string" ? body.fixedSessionTime : null;
 
   if (!patientId || !scheduledAtRaw) {
     return NextResponse.json({ error: "חובה לבחור מטופל ותאריך פגישה." }, { status: 400 });
   }
   const patient = await prisma.patient.findFirst({
     where: { id: patientId, ownerUserId: userId, archivedAt: null },
-    select: { id: true },
+    select: { id: true, fixedSessionDay: true, fixedSessionTime: true },
   });
   if (!patient) {
     return NextResponse.json({ error: "לא ניתן לקבוע פגישה למטופל לא פעיל או לא קיים." }, { status: 400 });
@@ -51,6 +54,13 @@ export async function POST(req: Request) {
         : undefined,
     },
   });
+
+  if (scheduleAction === "move_fixed" && fixedSessionDay !== null && fixedSessionTime) {
+    await prisma.patient.update({
+      where: { id: patientId },
+      data: { fixedSessionDay, fixedSessionTime },
+    });
+  }
 
   return NextResponse.json({ ok: true, sessionId: session.id });
 }

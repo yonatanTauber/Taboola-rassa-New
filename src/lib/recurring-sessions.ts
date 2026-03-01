@@ -23,13 +23,13 @@ function getIsraelWeekday(date: Date): number {
  * Build a UTC Date for a given Israel-local date + hour + minute.
  * e.g. date "2025-02-25" + hour 15 + minute 30 in Asia/Jerusalem → UTC Date
  */
-function buildIsraelDateTime(dateStr: string, hour: number, minute: number): Date {
+export function buildIsraelDateTime(dateStr: string, hour: number, minute: number): Date {
   // Parse as local Israel time by constructing a reference timestamp
   // We use the trick: parse midnight UTC for that date, then find the Israel offset
   const naive = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`);
   // naive is interpreted as LOCAL time of the server — instead, build proper UTC
   // by using the Intl offset approach
-  const parts = new Intl.DateTimeFormat("en-US", {
+  new Intl.DateTimeFormat("en-US", {
     timeZone: TZ,
     year: "numeric",
     month: "2-digit",
@@ -100,7 +100,8 @@ export function detectPotentialMerge(
   newSessionHour: number,
   newSessionMinute: number,
   patient: { fixedSessionDay?: number | null; fixedSessionTime?: string | null },
-  existingSessions: Array<{ id: string; scheduledAt: Date; status: SessionStatus }>
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _existingSessions: Array<{ id: string; scheduledAt: Date; status: SessionStatus }>
 ): MergeSuggestion {
   if (!patient.fixedSessionDay || !patient.fixedSessionTime) {
     return { shouldMerge: false, expectedTime: newSessionDate };
@@ -119,7 +120,7 @@ export function detectPotentialMerge(
   const expectedDate = getDateOfWeekday(newSessionDate, targetWeekday);
   const expectedDateStr = toIsraelDateStr(expectedDate);
   const expectedTime = buildIsraelDateTime(expectedDateStr, fixedHour, fixedMinute);
-  const newTime = buildIsraelDateTime(newDateStr, newSessionHour, newSessionMinute);
+  buildIsraelDateTime(newDateStr, newSessionHour, newSessionMinute);
 
   // Get the weekday of the new session in Israel timezone
   const newSessionWeekday = getIsraelWeekday(newSessionDate);
@@ -189,8 +190,8 @@ export async function generateUpcomingSessions(
   const targetWeekday = ((patient.fixedSessionDay - 1) + 7) % 7;
 
   // Start from the next occurrence of the fixed weekday
-  let currentDateStr = toIsraelDateStr(now);
-  let currentUTC = new Date(`${currentDateStr}T00:00:00Z`);
+  const currentDateStr = toIsraelDateStr(now);
+  const currentUTC = new Date(`${currentDateStr}T00:00:00Z`);
 
   // Find the first occurrence of the fixed weekday on or after today
   const currentWeekday = getIsraelWeekday(currentUTC);

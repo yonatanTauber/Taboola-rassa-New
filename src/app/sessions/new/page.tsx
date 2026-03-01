@@ -3,8 +3,10 @@ import { BackButton } from "@/components/BackButton";
 import { SessionCreateForm } from "@/components/sessions/SessionCreateForm";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { formatPatientName } from "@/lib/patient-name";
-import { detectPotentialMerge } from "@/lib/recurring-sessions";
+import { buildIsraelDateTime, detectPotentialMerge } from "@/lib/recurring-sessions";
 import { prisma } from "@/lib/prisma";
+
+const TZ = "Asia/Jerusalem";
 
 function toDateInput(date: Date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -12,6 +14,28 @@ function toDateInput(date: Date) {
 
 function toTimeInput(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes() - (date.getMinutes() % 5)).padStart(2, "0")}`;
+}
+
+function getIsraelWeekday(date: Date): number {
+  const dayName = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short" }).format(date);
+  const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return days[dayName] ?? 0;
+}
+
+function toDbFixedSessionDay(dateStr: string) {
+  const base = new Date(`${dateStr}T00:00:00Z`);
+  const jsDay = getIsraelWeekday(base); // 0=Sun..6=Sat in Israel tz
+  return jsDay === 6 ? 0 : jsDay + 1;
+}
+
+function getFixedDateForWeek(dateStr: string, fixedSessionDay: number) {
+  const base = new Date(`${dateStr}T00:00:00Z`);
+  const currentDay = getIsraelWeekday(base); // 0=Sun..6=Sat (Israel tz)
+  const targetDay = ((fixedSessionDay - 1) + 7) % 7;
+  const diff = targetDay - currentDay;
+  const fixedDate = new Date(base);
+  fixedDate.setUTCDate(base.getUTCDate() + diff);
+  return fixedDate.toISOString().slice(0, 10);
 }
 
 async function createSession(formData: FormData) {
@@ -25,6 +49,7 @@ async function createSession(formData: FormData) {
   const location = String(formData.get("location") ?? "קליניקה").trim();
   const feeNis = Number(formData.get("feeNis") ?? 0);
   const note = String(formData.get("note") ?? "").trim();
+  const scheduleAction = String(formData.get("scheduleAction") ?? "").trim();
 
   if (!patientId || !date || !time) {
     redirect(`/sessions/new?patientId=${patientId}&error=missing`);
@@ -41,12 +66,21 @@ async function createSession(formData: FormData) {
   });
   if (!patient) redirect("/sessions/new?error=patient");
 
-  const scheduledAt = new Date(`${date}T${time}:00`);
+  const [hourRaw, minuteRaw] = time.split(":").map(Number);
+  let scheduledAt = buildIsraelDateTime(date, Number(hourRaw), Number(minuteRaw));
   if (Number.isNaN(scheduledAt.getTime())) {
     redirect(`/sessions/new?patientId=${patientId}&error=datetime`);
   }
 
   const effectiveFee = Number.isFinite(feeNis) && feeNis > 0 ? feeNis : patient.defaultSessionFeeNis;
+
+  const effectiveTime = scheduleAction === "use_fixed" && patient.fixedSessionTime ? patient.fixedSessionTime : time;
+
+  if (scheduleAction === "use_fixed" && patient.fixedSessionDay && patient.fixedSessionTime) {
+    const fixedDate = getFixedDateForWeek(date, patient.fixedSessionDay);
+    const [fixedHour, fixedMinute] = patient.fixedSessionTime.split(":").map(Number);
+    scheduledAt = buildIsraelDateTime(fixedDate, Number(fixedHour), Number(fixedMinute));
+  }
 
   // Create the session
   const newSession = await prisma.session.create({
@@ -66,18 +100,38 @@ async function createSession(formData: FormData) {
     },
   });
 
+  if (scheduleAction === "move_fixed") {
+    const nextFixedDay = toDbFixedSessionDay(date);
+    // Delete future recurring template sessions so they get regenerated with the new day/time
+    await prisma.session.deleteMany({
+      where: {
+        patientId,
+        isRecurringTemplate: true,
+        status: "SCHEDULED",
+        scheduledAt: { gt: new Date() },
+      },
+    });
+    await prisma.patient.update({
+      where: { id: patientId },
+      data: {
+        fixedSessionDay: nextFixedDay,
+        fixedSessionTime: time,
+      },
+    });
+    redirect(`/sessions/${newSession.id}`);
+  }
+
   // Check if this session should be merged with a recurring schedule
-  if (patient.fixedSessionDay && patient.fixedSessionTime) {
+  if (!scheduleAction && patient.fixedSessionDay && patient.fixedSessionTime) {
     const existingSessions = await prisma.session.findMany({
       where: { patientId, status: { not: "CANCELED" } },
       select: { id: true, scheduledAt: true, status: true },
     });
 
-    const [fixedHour, fixedMinute] = patient.fixedSessionTime.split(":").map(Number);
     const mergeSuggestion = detectPotentialMerge(
       scheduledAt,
-      parseInt(time.split(":")[0], 10),
-      parseInt(time.split(":")[1], 10),
+      parseInt(effectiveTime.split(":")[0], 10),
+      parseInt(effectiveTime.split(":")[1], 10),
       {
         fixedSessionDay: patient.fixedSessionDay,
         fixedSessionTime: patient.fixedSessionTime,

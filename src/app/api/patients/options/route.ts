@@ -8,7 +8,14 @@ export async function GET() {
   if (!userId) return NextResponse.json({ patients: [] }, { status: 401 });
   const patients = await prisma.patient.findMany({
     where: { archivedAt: null, ownerUserId: userId },
-    select: { id: true, firstName: true, lastName: true, defaultSessionFeeNis: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      defaultSessionFeeNis: true,
+      fixedSessionDay: true,
+      fixedSessionTime: true,
+    },
     orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     take: 500,
   });
@@ -18,6 +25,8 @@ export async function GET() {
       id: p.id,
       name: formatPatientName(p.firstName, p.lastName),
       defaultSessionFeeNis: p.defaultSessionFeeNis,
+      fixedSessionDay: p.fixedSessionDay,
+      fixedSessionTime: p.fixedSessionTime,
     })),
   });
 }

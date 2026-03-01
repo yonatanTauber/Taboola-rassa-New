@@ -31,6 +31,7 @@ export function ResearchWorkspace({
   sourcesCatalog,
   initialFilters,
   uploadForPatientId,
+  autoOpenUpload,
 }: {
   docs: Doc[];
   patients: Option[];
@@ -39,6 +40,7 @@ export function ResearchWorkspace({
   sourcesCatalog: Option[];
   initialFilters: { q: string; kind: string; topic: string; author: string };
   uploadForPatientId?: string;
+  autoOpenUpload?: boolean;
 }) {
   const router = useRouter();
   const [q, setQ] = useState(initialFilters.q);
@@ -47,7 +49,8 @@ export function ResearchWorkspace({
   const [author, setAuthor] = useState(initialFilters.author);
   const [linkedOnly, setLinkedOnly] = useState(false);
   // Auto-open upload panel when arriving from a patient page
-  const [openUpload, setOpenUpload] = useState(!!uploadForPatientId);
+  const [openUpload, setOpenUpload] = useState(!!uploadForPatientId || !!autoOpenUpload);
+  const [saveUploadRef, setSaveUploadRef] = useState<null | (() => void)>(null);
 
   const topicOptions = useMemo(
     () => [...new Set(docs.flatMap((doc) => doc.topics).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")),
@@ -195,8 +198,9 @@ export function ResearchWorkspace({
       {openUpload ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/25 px-3 backdrop-blur-sm overscroll-contain" onClick={(e) => e.target === e.currentTarget && setOpenUpload(false)}>
           <div className="w-[min(94vw,980px)] rounded-2xl border border-black/16 bg-white p-4 shadow-2xl">
-            <div className="mb-2 flex items-center">
+            <div className="mb-2 flex items-center gap-2">
               <h2 className="me-auto text-lg font-semibold">העלאת מקור חדש</h2>
+              <button className="app-btn app-btn-primary" onClick={() => saveUploadRef?.()}>שמור</button>
               <button className="app-btn app-btn-secondary" onClick={() => setOpenUpload(false)}>סגור</button>
             </div>
             <div className="max-h-[78vh] overflow-auto">
@@ -207,6 +211,7 @@ export function ResearchWorkspace({
                 topicsCatalog={topicsCatalog}
                 sourcesCatalog={sourcesCatalog}
                 defaultPatientId={uploadForPatientId}
+                onSaveRef={(handler) => setSaveUploadRef(() => handler)}
               />
             </div>
           </div>

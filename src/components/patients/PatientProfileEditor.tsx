@@ -47,7 +47,8 @@ export function PatientProfileEditor({
   const [collapsed, setCollapsed] = useState(collapsible ? initiallyCollapsed && !startEditing : false);
   const [form, setForm] = useState<FormState>(initial);
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
-  const [pendingSaveData, setPendingSaveData] = useState<FormState | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_pendingSaveData, setPendingSaveData] = useState<FormState | null>(null);
 
   function detectScheduleChange(): boolean {
     return (

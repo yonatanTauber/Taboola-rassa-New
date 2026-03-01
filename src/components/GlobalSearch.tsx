@@ -48,20 +48,28 @@ export function GlobalSearch() {
 
   // Close on route change
   useEffect(() => {
-    setOpen(false);
-    setQuery("");
-    setResults([]);
+    setTimeout(() => {
+      setOpen(false);
+      setQuery("");
+      setResults([]);
+    }, 0);
   }, [pathname]);
 
   // Fetch results
   useEffect(() => {
-    if (debouncedQuery.length < 2) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
-    setLoading(true);
+    if (debouncedQuery.length < 2) {
+      setTimeout(() => {
+        if (!cancelled) {
+          setResults([]);
+          setLoading(false);
+        }
+      }, 0);
+      return () => { cancelled = true; };
+    }
+    setTimeout(() => {
+      if (!cancelled) setLoading(true);
+    }, 0);
     fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`)
       .then((r) => r.json())
       .then((data: { results: SearchResult[] }) => {
@@ -151,7 +159,6 @@ export function GlobalSearch() {
           placeholder="חיפוש... (⌘K)"
           className="w-44 rounded-xl border border-black/14 bg-white/90 py-1.5 pr-8 pl-3 text-sm text-ink placeholder:text-muted/60 transition-[width] focus:w-56 focus:outline-none focus:ring-1 focus:ring-accent/40"
           aria-label="חיפוש כללי"
-          aria-expanded={showDropdown}
           aria-autocomplete="list"
           autoComplete="off"
         />

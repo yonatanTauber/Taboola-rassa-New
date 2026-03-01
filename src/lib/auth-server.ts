@@ -14,7 +14,8 @@ export async function getCurrentUser() {
   if (!user) return null;
   // בטל session אם הסיסמה שונתה אחרי שהוא הונפק
   if (user.passwordChangedAt && parsed.issuedAt < user.passwordChangedAt.getTime()) return null;
-  const { passwordChangedAt: _, ...userWithoutSensitive } = user;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { passwordChangedAt: _passwordChangedAt, ...userWithoutSensitive } = user;
   return userWithoutSensitive;
 }
 

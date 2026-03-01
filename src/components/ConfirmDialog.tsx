@@ -25,7 +25,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/30 px-3"
+      className="fixed inset-0 z-[140] flex items-center justify-center bg-black/30 px-3"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel();
       }}
