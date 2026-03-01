@@ -258,6 +258,11 @@ export default async function PatientDetailsPage({
       href: link.href ?? null,
       updatedAt: link.updatedAt,
     })),
+    figures: patient.figures.map((f) => ({
+      id: f.id,
+      name: f.name,
+      role: f.role,
+    })),
   });
 
   return (

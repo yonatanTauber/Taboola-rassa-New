@@ -20,11 +20,13 @@ export function HebrewDateInput({
   onChange,
   namePrefix,
   ariaLabelPrefix,
+  disabled,
 }: {
   value: string;
   onChange: (next: string) => void;
   namePrefix?: string;
   ariaLabelPrefix?: string;
+  disabled?: boolean;
 }) {
   const now = new Date();
   const [y, m, d] = value.split("-").map(Number);
@@ -50,6 +52,7 @@ export function HebrewDateInput({
         value={day}
         onChange={(e) => setDate(year, month, Number(e.target.value))}
         className="app-select"
+        disabled={disabled}
       >
         {Array.from({ length: daysInMonth }).map((_, idx) => {
           const n = idx + 1;
@@ -67,6 +70,7 @@ export function HebrewDateInput({
         value={month}
         onChange={(e) => setDate(year, Number(e.target.value), day)}
         className="app-select"
+        disabled={disabled}
       >
         {months.map((label, idx) => (
           <option key={label} value={idx + 1}>
@@ -81,6 +85,7 @@ export function HebrewDateInput({
         value={year}
         onChange={(e) => setDate(Number(e.target.value), month, day)}
         className="app-select"
+        disabled={disabled}
       >
         {years.map((yopt) => (
           <option key={yopt} value={yopt}>

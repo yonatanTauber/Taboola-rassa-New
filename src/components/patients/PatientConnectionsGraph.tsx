@@ -33,12 +33,14 @@ const DEFAULT_FILTERS: GraphFilters = {
   "research-document": true,
   receipt: true,
   "external-link": true,
+  figure: true,
 };
 
 const FILTER_OPTIONS: Array<{ key: FilterKey; label: string }> = [
   { key: "session", label: "פגישות" },
   { key: "guidance", label: "הדרכות" },
   { key: "task", label: "משימות" },
+  { key: "figure", label: "דמויות" },
   { key: "research-document", label: "מאמרים" },
   { key: "research-note", label: "פתקים" },
   { key: "receipt", label: "קבלות" },
@@ -237,6 +239,7 @@ export function PatientConnectionsGraph({
                           "research-document": false,
                           receipt: false,
                           "external-link": false,
+                          figure: false,
                         })
                       }
                       className="text-muted hover:underline"
@@ -459,6 +462,7 @@ const DARK_NODE_STYLE: Record<ConnectionGraphNode["kind"], { fill: string; strok
   session: { fill: "#c6d4e5", stroke: "#78a4d6", text: "#dce8f6" },
   task: { fill: "#f0ddaf", stroke: "#d1aa53", text: "#f6e9c7" },
   guidance: { fill: "#cdd9e8", stroke: "#7d9ec2", text: "#deebfa" },
+  figure: { fill: "#c4b5fd", stroke: "#7c3aed", text: "#ede9fe" },
   "research-note": { fill: "#e5d8f2", stroke: "#b490df", text: "#f2e9ff" },
   "research-document": { fill: "#d9d2ec", stroke: "#a687d1", text: "#eee8f8" },
   receipt: { fill: "#eddcc6", stroke: "#d0a66f", text: "#f8e9d6" },
@@ -470,6 +474,7 @@ const LIGHT_NODE_STYLE: Record<ConnectionGraphNode["kind"], { fill: string; stro
   session: { fill: "#d2ddec", stroke: "#3b6a99", text: "#243f5c" },
   task: { fill: "#fde8be", stroke: "#b8822a", text: "#69490f" },
   guidance: { fill: "#d6e0ec", stroke: "#365a7b", text: "#1f3f5a" },
+  figure: { fill: "#ede9fe", stroke: "#7c3aed", text: "#4c1d95" },
   "research-note": { fill: "#e5daf3", stroke: "#7a4d99", text: "#512d67" },
   "research-document": { fill: "#dfd2e8", stroke: "#7a4d99", text: "#512d67" },
   receipt: { fill: "#efdfc4", stroke: "#8a6324", text: "#5f4317" },

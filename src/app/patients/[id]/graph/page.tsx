@@ -71,6 +71,11 @@ export default async function PatientGraphPage({ params }: { params: Promise<{ i
           },
         },
       },
+      figures: {
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: { id: true, name: true, role: true },
+      },
     },
   });
 
@@ -203,6 +208,11 @@ export default async function PatientGraphPage({ params }: { params: Promise<{ i
       label: link.label,
       href: link.href ?? null,
       updatedAt: link.updatedAt,
+    })),
+    figures: patient.figures.map((f) => ({
+      id: f.id,
+      name: f.name,
+      role: f.role,
     })),
   });
 

@@ -30,7 +30,24 @@ type Appearance = {
   sessionId: string;
   scheduledAt: string;
   status: string;
+  markdown: string;
 };
+
+/** Highlight all occurrences of `figureName` in `text` with a <mark> element. */
+function highlightName(text: string, figureName: string): React.ReactNode[] {
+  if (!figureName.trim()) return [text];
+  const escaped = figureName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="rounded bg-yellow-200 px-0.5 font-bold not-italic">
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
 
 export function FigurePageClient({
   figureId,
@@ -57,6 +74,7 @@ export function FigurePageClient({
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function markDirty() {
     setIsDirty(true);
@@ -184,26 +202,55 @@ export function FigurePageClient({
           <p className="text-sm text-muted">הדמות לא מוזכרת בתיעוד סשנים</p>
         ) : (
           <ul className="divide-y divide-black/[0.04]">
-            {appearances.map((a) => (
-              <li key={a.sessionId}>
-                <Link
-                  href={`/sessions/${a.sessionId}`}
-                  className="flex items-center justify-between px-1 py-2.5 transition hover:bg-accent-soft/30"
-                >
-                  <span className="text-sm font-medium text-ink">
-                    {new Date(a.scheduledAt).toLocaleDateString("he-IL", {
-                      weekday: "short",
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-muted">
-                    {SESSION_STATUS_LABELS[a.status] ?? a.status}
-                  </span>
-                </Link>
-              </li>
-            ))}
+            {appearances.map((a) => {
+              const isExpanded = expandedId === a.sessionId;
+              return (
+                <li key={a.sessionId}>
+                  {/* Clickable header row */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : a.sessionId)}
+                    className="flex w-full items-center justify-between px-1 py-2.5 text-start transition hover:bg-accent-soft/30"
+                  >
+                    <span className="text-sm font-medium text-ink">
+                      {new Date(a.scheduledAt).toLocaleDateString("he-IL", {
+                        weekday: "short",
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-muted">
+                        {SESSION_STATUS_LABELS[a.status] ?? a.status}
+                      </span>
+                      <span className="text-xs text-muted" aria-hidden="true">
+                        {isExpanded ? "▲" : "▼"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Expanded text with highlighted figure name */}
+                  {isExpanded && (
+                    <div className="rounded-lg bg-black/[0.02] px-3 pb-3 pt-2">
+                      {a.markdown.trim() ? (
+                        <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-ink/80">
+                          {highlightName(a.markdown, name)}
+                        </pre>
+                      ) : (
+                        <p className="text-xs text-muted">אין תוכן תיעוד לסשן זה.</p>
+                      )}
+                      <Link
+                        href={`/sessions/${a.sessionId}`}
+                        className="mt-2 inline-block text-xs text-accent hover:underline"
+                      >
+                        פתח סשן ←
+                      </Link>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

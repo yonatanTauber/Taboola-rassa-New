@@ -56,6 +56,7 @@ export default async function FigurePage({ params }: { params: Promise<{ id: str
     sessionId: sn.session.id,
     scheduledAt: sn.session.scheduledAt.toISOString(),
     status: sn.session.status,
+    markdown: sn.markdown,
   }));
 
   return (

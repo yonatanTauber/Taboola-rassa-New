@@ -110,8 +110,13 @@ export function detectPotentialMerge(
     .split(":")
     .map(Number);
 
+  // The DB stores fixedSessionDay as: 1=Sunday, 2=Monday ... 6=Friday, 0=Saturday.
+  // getIsraelWeekday returns:         0=Sunday, 1=Monday ... 5=Friday, 6=Saturday.
+  // Convert to 0-indexed (JS weekday convention) so comparisons are correct.
+  const targetWeekday = ((patient.fixedSessionDay - 1) + 7) % 7;
+
   const newDateStr = toIsraelDateStr(newSessionDate);
-  const expectedDate = getDateOfWeekday(newSessionDate, patient.fixedSessionDay);
+  const expectedDate = getDateOfWeekday(newSessionDate, targetWeekday);
   const expectedDateStr = toIsraelDateStr(expectedDate);
   const expectedTime = buildIsraelDateTime(expectedDateStr, fixedHour, fixedMinute);
   const newTime = buildIsraelDateTime(newDateStr, newSessionHour, newSessionMinute);
@@ -177,13 +182,18 @@ export async function generateUpcomingSessions(
 
   const sessions: Date[] = [];
 
+  // The DB stores fixedSessionDay as: 1=Sunday, 2=Monday ... 6=Friday, 0=Saturday.
+  // getIsraelWeekday returns:         0=Sunday, 1=Monday ... 5=Friday, 6=Saturday.
+  // Convert to 0-indexed (JS weekday convention) so comparisons are correct.
+  const targetWeekday = ((patient.fixedSessionDay - 1) + 7) % 7;
+
   // Start from the next occurrence of the fixed weekday
   let currentDateStr = toIsraelDateStr(now);
   let currentUTC = new Date(`${currentDateStr}T00:00:00Z`);
 
   // Find the first occurrence of the fixed weekday on or after today
   const currentWeekday = getIsraelWeekday(currentUTC);
-  let dayDiff = (patient.fixedSessionDay - currentWeekday + 7) % 7;
+  let dayDiff = (targetWeekday - currentWeekday + 7) % 7;
   if (dayDiff === 0) {
     // Check if today's session time has already passed
     const todaySession = buildIsraelDateTime(currentDateStr, hour, minute);

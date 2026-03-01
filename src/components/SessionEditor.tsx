@@ -42,19 +42,30 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [undocumentedConfirmOpen, setUndocumentedConfirmOpen] = useState(false);
+  const [futureWarningOpen, setFutureWarningOpen] = useState(false);
 
   // Check if status is finalized (not SCHEDULED anymore)
   const isFinalized = form.status !== "SCHEDULED";
+
+  // When finalized and not actively editing — all form fields are read-only
+  const isReadOnly = isFinalized && !isEditing;
 
   async function save(allowUndocumented = false) {
     // Build as local time in browser → correct UTC conversion via toISOString()
     const localStr = `${datePart}T${hourPart}:${minutePart}`;
     const scheduled = new Date(localStr); // browser interprets as local time
     const scheduledAtUTC = scheduled.toISOString(); // → UTC for the server
-    const isPastSession = scheduled.getTime() <= Date.now();
+    const isFuture = scheduled.getTime() > Date.now();
+    const isPastSession = !isFuture;
     const hasNote = form.note.trim().length > 0;
     const hasSubstantialNote = form.note.trim().length > 10;
     let nextStatus = form.status;
+
+    // Block completing a session that is still in the future
+    if (isFuture && (hasSubstantialNote || form.status === "COMPLETED")) {
+      setFutureWarningOpen(true);
+      return;
+    }
 
     if (hasSubstantialNote && form.status === "SCHEDULED") {
       // "אשר" button clicked — always mark as completed
@@ -123,7 +134,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       showToast({ message: "מחיקת פגישה נכשלה" });
       return;
     }
-    showToast({ message: "הפגישה נמחק" });
+    showToast({ message: "הפגישה נמחקה" });
     router.push("/sessions");
     router.refresh();
   }
@@ -141,7 +152,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       showToast({ message: "ביטול פגישה נכשל" });
       return;
     }
-    showToast({ message: "הפגישה סומן כמבוטל" });
+    showToast({ message: "הפגישה סומנה כמבוטלת" });
     router.back();
     router.refresh();
   }
@@ -151,9 +162,20 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       <h2 className="text-lg font-semibold">עריכת פגישה</h2>
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
         <div className="space-y-2">
-          <HebrewDateInput namePrefix="sessionDate" ariaLabelPrefix="תאריך פגישה" value={datePart} onChange={setDatePart} />
+          <HebrewDateInput
+            namePrefix="sessionDate"
+            ariaLabelPrefix="תאריך פגישה"
+            value={datePart}
+            onChange={setDatePart}
+            disabled={isReadOnly}
+          />
           <div className="grid grid-cols-2 gap-2">
-            <select value={minutePart} onChange={(e) => setMinutePart(e.target.value)} className="app-select">
+            <select
+              value={minutePart}
+              onChange={(e) => setMinutePart(e.target.value)}
+              className="app-select"
+              disabled={isReadOnly}
+            >
               {Array.from({ length: 12 }).map((_, idx) => {
                 const value = String(idx * 5).padStart(2, "0");
                 return (
@@ -163,7 +185,12 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
                 );
               })}
             </select>
-            <select value={hourPart} onChange={(e) => setHourPart(e.target.value)} className="app-select">
+            <select
+              value={hourPart}
+              onChange={(e) => setHourPart(e.target.value)}
+              className="app-select"
+              disabled={isReadOnly}
+            >
               {Array.from({ length: 24 }).map((_, hour) => {
                 const value = String(hour).padStart(2, "0");
                 return (
@@ -175,7 +202,12 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
             </select>
           </div>
         </div>
-        <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className="app-select">
+        <select
+          value={form.status}
+          onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
+          className="app-select"
+          disabled={isReadOnly}
+        >
           <option value="SCHEDULED">נקבעה</option>
           <option value="COMPLETED">התקיימה</option>
           <option value="CANCELED">בוטלה</option>
@@ -184,14 +216,31 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         </select>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <select value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} className="app-select">
+        <select
+          value={form.location}
+          onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
+          className="app-select"
+          disabled={isReadOnly}
+        >
           <option value="קליניקה">קליניקה</option>
           <option value="אונליין">אונליין</option>
           <option value="">אחר</option>
         </select>
-        <input value={form.feeNis} onChange={(e) => setForm((p) => ({ ...p, feeNis: e.target.value }))} placeholder="מחיר" className="app-field" />
+        <input
+          value={form.feeNis}
+          onChange={(e) => setForm((p) => ({ ...p, feeNis: e.target.value }))}
+          placeholder="מחיר"
+          className="app-field"
+          readOnly={isReadOnly}
+        />
       </div>
-      <textarea value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="תוכן הפגישה" className="app-textarea min-h-32" />
+      <textarea
+        value={form.note}
+        onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
+        placeholder="תוכן הפגישה"
+        className={`app-textarea min-h-32${isReadOnly ? " cursor-default bg-black/[0.02]" : ""}`}
+        readOnly={isReadOnly}
+      />
 
       <div className="flex items-center justify-between gap-2">
         {/* Show action buttons only if: not finalized OR in editing mode */}
@@ -206,12 +255,19 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
               >
                 בטל פגישה
               </button>
-              <button type="button" onClick={() => setDeleteOpen(true)} className="app-btn app-btn-secondary text-danger" disabled={canceling || deleting}>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="app-btn app-btn-secondary text-danger"
+                disabled={canceling || deleting}
+              >
                 מחק פגישה
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setIsEditing(false)} className="app-btn app-btn-secondary">ביטול</button>
+              <button onClick={() => setIsEditing(false)} className="app-btn app-btn-secondary">
+                ביטול
+              </button>
               <button onClick={() => void save()} className="app-btn app-btn-primary">
                 {form.note.trim().length > 10 ? "אשר" : "עדכן"}
               </button>
@@ -239,7 +295,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       <ConfirmDialog
         open={cancelOpen}
         title="ביטול פגישה"
-        message="האם לסמן את הפגישה כמבוטל?"
+        message="האם לסמן את הפגישה כמבוטלת?"
         confirmLabel="בטל פגישה"
         danger={false}
         onCancel={() => setCancelOpen(false)}
@@ -259,7 +315,15 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
           void save(true);
         }}
       />
+      <ConfirmDialog
+        open={futureWarningOpen}
+        title="הטיפול במצב עתידי"
+        message={"לא ניתן לסגור טיפול שמועדו עדיין לא הגיע.\nהפגישה תישאר במצב 'נקבעה'."}
+        confirmLabel="הבנתי"
+        danger={false}
+        onCancel={() => setFutureWarningOpen(false)}
+        onConfirm={() => setFutureWarningOpen(false)}
+      />
     </div>
   );
 }
-

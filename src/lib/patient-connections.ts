@@ -6,7 +6,8 @@ export type ConnectionNodeKind =
   | "research-note"
   | "research-document"
   | "receipt"
-  | "external-link";
+  | "external-link"
+  | "figure";
 
 export type ConnectionEdgeRelation = "primary" | "secondary";
 
@@ -32,6 +33,18 @@ export type PatientConnectionsGraphData = {
   patientNodeId: string;
   nodes: ConnectionGraphNode[];
   edges: ConnectionGraphEdge[];
+};
+
+const FIGURE_ROLE_LABELS: Record<string, string> = {
+  MOTHER: "אמא",
+  FATHER: "אבא",
+  SISTER: "אחות",
+  BROTHER: "אח",
+  PARTNER: "בן/בת זוג",
+  FRIEND: "חבר/ה",
+  COLLEAGUE: "עמית",
+  ACQUAINTANCE: "מכר",
+  OTHER: "אחר",
 };
 
 type BuildInput = {
@@ -62,6 +75,7 @@ type BuildInput = {
     paymentAllocations: Array<{ sessionId: string }>;
   }>;
   conceptLinks: Array<{ id: string; label: string; href: string | null; updatedAt?: Date }>;
+  figures: Array<{ id: string; name: string; role: string }>;
 };
 
 export function buildPatientConnectionsGraphData(input: BuildInput): PatientConnectionsGraphData {
@@ -153,6 +167,20 @@ export function buildPatientConnectionsGraphData(input: BuildInput): PatientConn
     for (const sessionLink of guidance.sessions) {
       addEdge(guidanceId, `session:${sessionLink.session.id}`, "secondary");
     }
+  }
+
+  for (const figure of input.figures) {
+    const figureNodeId = `figure:${figure.id}`;
+    upsertNode({
+      id: figureNodeId,
+      kind: "figure",
+      label: figure.name,
+      meta: FIGURE_ROLE_LABELS[figure.role] ?? figure.role,
+      href: `/figures/${figure.id}`,
+      priority: 35,
+      sortValue: 0,
+    });
+    connectToPatient(figureNodeId);
   }
 
   for (const note of input.linkedResearchNotes) {
