@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 
 const topicLexicon: Array<{ label: string; pattern: RegExp }> = [
   { label: "דיכאון", pattern: /דיכאון|depress/i },
@@ -69,12 +69,10 @@ export async function extractResearchMetadata(file: File) {
   if (file.type.includes("text") || lowerName.endsWith(".txt") || lowerName.endsWith(".md")) {
     text = bytes.toString("utf8");
   } else if (file.type.includes("pdf") || lowerName.endsWith(".pdf")) {
-    const parser = new PDFParse({ data: bytes });
-    const [textResult, infoResult] = await Promise.all([parser.getText(), parser.getInfo()]);
-    text = textResult.text ?? "";
-    metadataTitle = (infoResult.info?.Title as string | undefined) || null;
-    metadataAuthor = (infoResult.info?.Author as string | undefined) || null;
-    await parser.destroy();
+    const parsed = await pdfParse(bytes);
+    text = parsed.text ?? "";
+    metadataTitle = (parsed.info?.Title as string | undefined) || null;
+    metadataAuthor = (parsed.info?.Author as string | undefined) || null;
   }
 
   const title = (metadataTitle && metadataTitle.trim()) || guessTitle(text, file.name);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useQuickActions } from "@/components/QuickActions";
 
 type PatientOption = {
@@ -17,12 +17,16 @@ export function ResearchUploadPanel({
   topicsCatalog,
   sourcesCatalog,
   inModal = false,
+  defaultPatientId = "",
+  onSaveRef,
 }: {
   patients: PatientOption[];
   authorsCatalog: Option[];
   topicsCatalog: Option[];
   sourcesCatalog: Option[];
   inModal?: boolean;
+  defaultPatientId?: string;
+  onSaveRef?: (handler: () => void) => void;
 }) {
   const router = useRouter();
   const { showToast } = useQuickActions();
@@ -30,16 +34,14 @@ export function ResearchUploadPanel({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
-  const [source, setSource] = useState("");
+  const [sourceInput, setSourceInput] = useState("");
   const [sourceId, setSourceId] = useState("");
   const [sourceCustom, setSourceCustom] = useState("");
-  const [authors, setAuthors] = useState("");
-  const [authorPick, setAuthorPick] = useState("");
-  const [authorCustom, setAuthorCustom] = useState("");
-  const [topics, setTopics] = useState("");
-  const [topicPick, setTopicPick] = useState("");
-  const [topicCustom, setTopicCustom] = useState("");
-  const [patientId, setPatientId] = useState("");
+  const [authors, setAuthors] = useState<string[]>([]);
+  const [authorInput, setAuthorInput] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
+  const [topicInput, setTopicInput] = useState("");
+  const [patientId, setPatientId] = useState(defaultPatientId);
   const [kind, setKind] = useState("ARTICLE");
   const [externalUrl, setExternalUrl] = useState("");
   const [suggested, setSuggested] = useState(false);
@@ -48,18 +50,18 @@ export function ResearchUploadPanel({
     "ARTICLE_FILE" | "ARTICLE_LINK" | "BOOK" | "JOURNAL" | "NEWS" | "VIDEO_LINK"
   >("ARTICLE_FILE");
 
+
   const canAnalyze = Boolean(file) && !loading && entryType === "ARTICLE_FILE";
   const canAnalyzeLink = Boolean(externalUrl.trim()) && !loading && entryType !== "ARTICLE_FILE";
-  const canSave =
-    (Boolean(file) || Boolean(externalUrl.trim())) &&
-    Boolean(title.trim()) &&
-    Boolean(patientId) &&
-    !saving;
+  const canSave = !saving;
 
   const selectedPatientName = useMemo(
     () => patients.find((patient) => patient.id === patientId)?.name ?? "",
     [patients, patientId],
   );
+  const sourcesByName = useMemo(() => new Map(sourcesCatalog.map((item) => [item.name, item.id])), [sourcesCatalog]);
+  const authorsByName = useMemo(() => new Set(authorsCatalog.map((item) => item.name)), [authorsCatalog]);
+  const topicsByName = useMemo(() => new Set(topicsCatalog.map((item) => item.name)), [topicsCatalog]);
   const authorsLabel = entryType === "VIDEO_LINK" ? "מרצה/יוצר (מופרד בפסיקים)" : "כותבים (מופרד בפסיקים)";
   const sourceLabel =
     entryType === "VIDEO_LINK"
@@ -93,8 +95,8 @@ export function ResearchUploadPanel({
     };
 
     setTitle(payload.metadata.title ?? "");
-    setAuthors(payload.metadata.authors?.join(", ") ?? "");
-    setTopics(payload.metadata.topics?.join(", ") ?? "");
+    setAuthors((payload.metadata.authors ?? []).filter(Boolean));
+    setTopics((payload.metadata.topics ?? []).filter(Boolean));
     setSuggested(true);
     showToast({ message: "המערכת הציעה כותרת/כותבים/נושאים. אפשר לערוך ואז לשמור." });
   }
@@ -116,31 +118,31 @@ export function ResearchUploadPanel({
       metadata: { title?: string; authors?: string[]; topics?: string[]; source?: string };
     };
     if (payload.metadata.title) setTitle(payload.metadata.title);
-    if (payload.metadata.authors?.length) setAuthors(payload.metadata.authors.join(", "));
-    if (payload.metadata.topics?.length) setTopics(payload.metadata.topics.join(", "));
-    if (payload.metadata.source) setSource(payload.metadata.source);
+    if (payload.metadata.authors?.length) setAuthors(payload.metadata.authors.filter(Boolean));
+    if (payload.metadata.topics?.length) setTopics(payload.metadata.topics.filter(Boolean));
+    if (payload.metadata.source) setSourceInput(payload.metadata.source);
     setSuggested(true);
     showToast({ message: "חולצו נתונים מהקישור. נא לעבור ולאשר." });
   }
 
-  async function save() {
-    if (!title.trim()) return;
-    if (entryType === "ARTICLE_FILE" && !file) return;
-    if (entryType !== "ARTICLE_FILE" && !externalUrl.trim()) return;
-    if (!patientId) {
-      showToast({ message: "יש לבחור מטופל לפני שמירה." });
-      return;
+  const save = useCallback(async () => {
+    if (entryType === "ARTICLE_FILE" && !file && !externalUrl.trim() && !sourceInput.trim() && !title.trim()) {
+      // Allow saving even with no inputs; will create a minimal record.
     }
 
     setSaving(true);
     const body = new FormData();
     if (file && entryType === "ARTICLE_FILE") body.append("file", file);
+    const sourceValue = sourceInput.trim();
+    const resolvedSourceId = sourceId || sourcesByName.get(sourceValue) || "";
+    const resolvedSourceCustom = sourceCustom.trim() || (!resolvedSourceId && sourceValue ? sourceValue : "");
+
     body.append("title", title.trim());
-    body.append("source", source.trim());
-    body.append("sourceId", sourceId);
-    body.append("sourceCustom", sourceCustom.trim());
-    body.append("authors", authors.trim());
-    body.append("topics", topics.trim());
+    body.append("source", sourceValue);
+    body.append("sourceId", resolvedSourceId);
+    body.append("sourceCustom", resolvedSourceCustom);
+    body.append("authors", authors.join(", "));
+    body.append("topics", topics.join(", "));
     body.append("patientId", patientId);
     body.append("kind", effectiveKind(entryType, kind));
     body.append("externalUrl", externalUrl.trim());
@@ -153,21 +155,26 @@ export function ResearchUploadPanel({
     setSaving(false);
 
     if (!res.ok) {
-      showToast({ message: "שמירת המסמך נכשלה." });
+      let errorMessage = "שמירת המסמך נכשלה.";
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) errorMessage = payload.error;
+      } catch {
+        // keep fallback
+      }
+      showToast({ message: errorMessage });
       return;
     }
 
     setFile(null);
     setTitle("");
-    setSource("");
+    setSourceInput("");
     setSourceId("");
     setSourceCustom("");
-    setAuthors("");
-    setAuthorPick("");
-    setAuthorCustom("");
-    setTopics("");
-    setTopicPick("");
-    setTopicCustom("");
+    setAuthors([]);
+    setAuthorInput("");
+    setTopics([]);
+    setTopicInput("");
     setPatientId("");
     setKind("ARTICLE");
     setExternalUrl("");
@@ -175,7 +182,11 @@ export function ResearchUploadPanel({
     setSuggested(false);
     showToast({ message: "המסמך נשמר במרחב המחקר" });
     router.refresh();
-  }
+  }, [authors, entryType, externalUrl, file, kind, patientId, showToast, sourceCustom, sourceId, sourceInput, topics, workspaceNotes, router, title, sourcesByName]);
+
+  useEffect(() => {
+    if (onSaveRef) onSaveRef(save);
+  }, [onSaveRef, save]);
 
   return (
     <section className={`${inModal ? "" : "app-section"}`}>
@@ -287,101 +298,161 @@ export function ResearchUploadPanel({
         </select>
 
         <input name="title" autoComplete="off" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="כותרת פריט… לדוגמה: טראומה מורכבת" className="app-field" />
-        <input name="source" autoComplete="off" value={source} onChange={(e) => setSource(e.target.value)} placeholder={`${sourceLabel}… לדוגמה: JAMA (טקסט חופשי)`} className="app-field" />
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <select name="sourceId" autoComplete="off" value={sourceId} onChange={(e) => setSourceId(e.target.value)} className="app-select">
-            <option value="">בחר מקור קיים</option>
-            {sourcesCatalog.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-            <option value="__custom__">אחר</option>
-          </select>
-          {sourceId === "__custom__" ? (
+
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted">מקור</span>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
             <input
-              name="sourceCustom" autoComplete="off" value={sourceCustom}
-              onChange={(e) => setSourceCustom(e.target.value)}
-              placeholder="מקור חדש…"
+              list="research-source-options"
+              name="source"
+              autoComplete="off"
+              value={sourceInput}
+              onChange={(e) => {
+                setSourceInput(e.target.value);
+                setSourceId("");
+                setSourceCustom("");
+              }}
+              placeholder={`${sourceLabel}… לדוגמה: JAMA`}
               className="app-field"
             />
-          ) : (
-            <div />
-          )}
+            <button
+              type="button"
+              className="app-btn app-btn-secondary"
+              onClick={() => {
+                const candidate = sourceInput.trim();
+                if (!candidate) return;
+                const matchId = sourcesByName.get(candidate);
+                if (matchId) {
+                  setSourceId(matchId);
+                  setSourceCustom("");
+                  showToast({ message: "מקור קיים נבחר." });
+                } else {
+                  setSourceId("");
+                  setSourceCustom(candidate);
+                  showToast({ message: "מקור חדש יישמר בעת שמירה." });
+                }
+                setSourceInput(candidate);
+              }}
+            >
+              הוסף מקור
+            </button>
+          </div>
+          <datalist id="research-source-options">
+            {sourcesCatalog.map((item) => (
+              <option key={item.id} value={item.name} />
+            ))}
+          </datalist>
+          {sourceId || sourceCustom ? (
+            <div className="text-xs text-muted">מקור נבחר: {sourceInput.trim() || sourceCustom || "ללא"}</div>
+          ) : null}
         </div>
 
-        <input name="authors" autoComplete="off" value={authors} onChange={(e) => setAuthors(e.target.value)} placeholder={`${authorsLabel}… לדוגמה: Freud, Klein`} className="app-field" />
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2">
-          <select name="authorPick" autoComplete="off" value={authorPick} onChange={(e) => setAuthorPick(e.target.value)} className="app-select">
-            <option value="">בחר כותב קיים</option>
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted">{authorsLabel}</span>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input
+              list="research-author-options"
+              autoComplete="off"
+              value={authorInput}
+              onChange={(e) => setAuthorInput(e.target.value)}
+              placeholder="הקלד/י שם כותב…"
+              className="app-field"
+            />
+            <button
+              type="button"
+              className="app-btn app-btn-secondary"
+              onClick={() => {
+                const candidate = authorInput.trim();
+                if (!candidate) return;
+                setAuthors((prev) => (prev.includes(candidate) ? prev : [...prev, candidate]));
+                setAuthorInput("");
+                showToast({
+                  message: authorsByName.has(candidate) ? "הכותב נוסף לרשימה." : "הכותב חדש ויישמר בעת שמירה.",
+                });
+              }}
+            >
+              הוסף כותב
+            </button>
+          </div>
+          <datalist id="research-author-options">
             {authorsCatalog.map((item) => (
-              <option key={item.id} value={item.name}>
-                {item.name}
-              </option>
+              <option key={item.id} value={item.name} />
             ))}
-            <option value="__custom__">אחר</option>
-          </select>
-          {authorPick === "__custom__" ? (
-            <input name="authorCustom" autoComplete="off" value={authorCustom} onChange={(e) => setAuthorCustom(e.target.value)} placeholder="כותב חדש…" className="app-field" />
-          ) : (
-            <div />
-          )}
-          <button
-            type="button"
-            className="app-btn app-btn-secondary"
-            onClick={() => {
-              const candidate = authorPick === "__custom__" ? authorCustom.trim() : authorPick.trim();
-              if (!candidate) return;
-              const list = authors
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean);
-              if (!list.includes(candidate)) {
-                setAuthors([...list, candidate].join(", "));
-              }
-              setAuthorPick("");
-              setAuthorCustom("");
-            }}
-          >
-            הוסף כותב
-          </button>
+          </datalist>
+          {authors.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {authors.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-2 py-0.5 text-xs"
+                >
+                  {name}
+                  <button
+                    type="button"
+                    onClick={() => setAuthors((prev) => prev.filter((item) => item !== name))}
+                    className="text-muted transition hover:text-rose-500"
+                    aria-label={`הסר ${name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        <input name="topics" autoComplete="off" value={topics} onChange={(e) => setTopics(e.target.value)} placeholder="נושאים… לדוגמה: חרדה, CBT" className="app-field" />
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2">
-          <select name="topicPick" autoComplete="off" value={topicPick} onChange={(e) => setTopicPick(e.target.value)} className="app-select">
-            <option value="">בחר נושא קיים</option>
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted">נושאים</span>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input
+              list="research-topic-options"
+              autoComplete="off"
+              value={topicInput}
+              onChange={(e) => setTopicInput(e.target.value)}
+              placeholder="בחר/י או הקלד/י נושא…"
+              className="app-field"
+            />
+            <button
+              type="button"
+              className="app-btn app-btn-secondary"
+              onClick={() => {
+                const candidate = topicInput.trim();
+                if (!candidate) return;
+                setTopics((prev) => (prev.includes(candidate) ? prev : [...prev, candidate]));
+                setTopicInput("");
+                showToast({
+                  message: topicsByName.has(candidate) ? "הנושא נוסף לרשימה." : "הנושא חדש ויישמר בעת שמירה.",
+                });
+              }}
+            >
+              הוסף נושא
+            </button>
+          </div>
+          <datalist id="research-topic-options">
             {topicsCatalog.map((item) => (
-              <option key={item.id} value={item.name}>
-                {item.name}
-              </option>
+              <option key={item.id} value={item.name} />
             ))}
-            <option value="__custom__">אחר</option>
-          </select>
-          {topicPick === "__custom__" ? (
-            <input name="topicCustom" autoComplete="off" value={topicCustom} onChange={(e) => setTopicCustom(e.target.value)} placeholder="נושא חדש…" className="app-field" />
-          ) : (
-            <div />
-          )}
-          <button
-            type="button"
-            className="app-btn app-btn-secondary"
-            onClick={() => {
-              const candidate = topicPick === "__custom__" ? topicCustom.trim() : topicPick.trim();
-              if (!candidate) return;
-              const list = topics
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean);
-              if (!list.includes(candidate)) {
-                setTopics([...list, candidate].join(", "));
-              }
-              setTopicPick("");
-              setTopicCustom("");
-            }}
-          >
-            הוסף נושא
-          </button>
+          </datalist>
+          {topics.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {topics.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-2 py-0.5 text-xs"
+                >
+                  {name}
+                  <button
+                    type="button"
+                    onClick={() => setTopics((prev) => prev.filter((item) => item !== name))}
+                    className="text-muted transition hover:text-rose-500"
+                    aria-label={`הסר ${name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <select name="patientId" autoComplete="off" value={patientId} onChange={(e) => setPatientId(e.target.value)} className="app-select">
