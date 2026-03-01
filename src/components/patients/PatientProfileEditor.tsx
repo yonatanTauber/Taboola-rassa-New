@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuickActions } from "@/components/QuickActions";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PatientStatusDialog } from "@/components/patients/PatientStatusDialog";
 
 type FormState = {
@@ -45,8 +46,17 @@ export function PatientProfileEditor({
   const [statusOpen, setStatusOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(collapsible ? initiallyCollapsed && !startEditing : false);
   const [form, setForm] = useState<FormState>(initial);
+  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
+  const [pendingSaveData, setPendingSaveData] = useState<FormState | null>(null);
 
-  async function save() {
+  function detectScheduleChange(): boolean {
+    return (
+      form.fixedSessionDay !== initial.fixedSessionDay ||
+      form.fixedSessionTime !== initial.fixedSessionTime
+    );
+  }
+
+  async function performSave(shouldRegenerateIfValid = true) {
     setSaving(true);
     const res = await fetch(`/api/patients/${patientId}`, {
       method: "PATCH",
@@ -65,12 +75,10 @@ export function PatientProfileEditor({
       return;
     }
 
-    // Always trigger auto-generation when a valid schedule exists.
-    // generateUpcomingSessions is idempotent — it avoids duplicates, so calling it
-    // even when the schedule didn't change just fills in any missing future sessions.
+    // Trigger auto-generation when a valid schedule exists.
     const hasValidSchedule = form.fixedSessionDay !== "" && form.fixedSessionTime !== "";
 
-    if (hasValidSchedule) {
+    if (shouldRegenerateIfValid && hasValidSchedule) {
       try {
         await fetch("/api/sessions/recurring", {
           method: "POST",
@@ -90,7 +98,24 @@ export function PatientProfileEditor({
     }
 
     setEditing(false);
+    setPendingSaveData(null);
     router.refresh();
+  }
+
+  async function save() {
+    // Check if schedule changed
+    if (detectScheduleChange()) {
+      // Show dialog asking if they want to regenerate
+      const newDay = form.fixedSessionDay !== "" && form.fixedSessionTime !== "";
+      if (newDay) {
+        setPendingSaveData(form);
+        setRegenerateDialogOpen(true);
+        return;
+      }
+    }
+
+    // No schedule change, save normally
+    await performSave();
   }
 
   return (
@@ -246,6 +271,24 @@ export function PatientProfileEditor({
         ) : null}
       </div>
       ) : null}
+
+      <ConfirmDialog
+        open={regenerateDialogOpen}
+        title="עדכון מועד הפגישה הקבועה"
+        message={`יש לך מטופל עם מועד פגישה קבוע קיים.\nהאם לעדכן את כל הפגישות הקבועות למועד החדש?`}
+        confirmLabel="עדכן פגישות"
+        cancelLabel="שמור בלי עדכון"
+        danger={false}
+        busy={saving}
+        onConfirm={async () => {
+          setRegenerateDialogOpen(false);
+          await performSave(true);
+        }}
+        onCancel={async () => {
+          setRegenerateDialogOpen(false);
+          await performSave(false);
+        }}
+      />
 
       <PatientStatusDialog
         open={statusOpen}

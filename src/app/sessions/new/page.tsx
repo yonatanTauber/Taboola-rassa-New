@@ -3,6 +3,7 @@ import { BackButton } from "@/components/BackButton";
 import { SessionCreateForm } from "@/components/sessions/SessionCreateForm";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { formatPatientName } from "@/lib/patient-name";
+import { detectPotentialMerge } from "@/lib/recurring-sessions";
 import { prisma } from "@/lib/prisma";
 
 function toDateInput(date: Date) {
@@ -31,7 +32,12 @@ async function createSession(formData: FormData) {
 
   const patient = await prisma.patient.findFirst({
     where: { id: patientId, ownerUserId: userId, archivedAt: null },
-    select: { id: true, defaultSessionFeeNis: true },
+    select: {
+      id: true,
+      defaultSessionFeeNis: true,
+      fixedSessionDay: true,
+      fixedSessionTime: true,
+    },
   });
   if (!patient) redirect("/sessions/new?error=patient");
 
@@ -42,7 +48,8 @@ async function createSession(formData: FormData) {
 
   const effectiveFee = Number.isFinite(feeNis) && feeNis > 0 ? feeNis : patient.defaultSessionFeeNis;
 
-  await prisma.session.create({
+  // Create the session
+  const newSession = await prisma.session.create({
     data: {
       patientId,
       scheduledAt,
@@ -58,6 +65,35 @@ async function createSession(formData: FormData) {
         : undefined,
     },
   });
+
+  // Check if this session should be merged with a recurring schedule
+  if (patient.fixedSessionDay && patient.fixedSessionTime) {
+    const existingSessions = await prisma.session.findMany({
+      where: { patientId, status: { not: "CANCELED" } },
+      select: { id: true, scheduledAt: true, status: true },
+    });
+
+    const [fixedHour, fixedMinute] = patient.fixedSessionTime.split(":").map(Number);
+    const mergeSuggestion = detectPotentialMerge(
+      scheduledAt,
+      parseInt(time.split(":")[0], 10),
+      parseInt(time.split(":")[1], 10),
+      {
+        fixedSessionDay: patient.fixedSessionDay,
+        fixedSessionTime: patient.fixedSessionTime,
+      },
+      existingSessions
+    );
+
+    if (mergeSuggestion.shouldMerge) {
+      // Encode merge suggestion in URL
+      const params = new URLSearchParams({
+        sessionId: newSession.id,
+        suggestMerge: "true",
+      });
+      redirect(`/sessions/${newSession.id}?${params.toString()}`);
+    }
+  }
 
   redirect(`/patients/${patientId}`);
 }

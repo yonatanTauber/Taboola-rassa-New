@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import { useQuickActions } from "@/components/QuickActions";
@@ -30,6 +30,7 @@ function utcToLocalDateTimeStr(utcStr: string) {
 
 export function SessionEditor({ session }: { session: SessionPayload }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useQuickActions();
   const [form, setForm] = useState(session);
   const [isEditing, setIsEditing] = useState(false);
@@ -43,6 +44,44 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const [canceling, setCanceling] = useState(false);
   const [undocumentedConfirmOpen, setUndocumentedConfirmOpen] = useState(false);
   const [futureWarningOpen, setFutureWarningOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [merging, setMerging] = useState(false);
+
+  // Detect merge suggestion from URL
+  useEffect(() => {
+    const suggestMerge = searchParams.get("suggestMerge") === "true";
+    if (suggestMerge) {
+      setMergeOpen(true);
+    }
+  }, [searchParams]);
+
+  async function handleMergeWithRecurring() {
+    setMerging(true);
+    const res = await fetch(`/api/sessions/${form.id}/merge-recurring`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+    });
+    setMerging(false);
+
+    if (!res.ok) {
+      showToast({ message: "עדכון מועד הפגישה נכשל" });
+      return;
+    }
+
+    const payload = (await res.json()) as { scheduledAt?: string };
+    if (payload.scheduledAt) {
+      // Update the form with the new time
+      const newLocalDT = utcToLocalDateTimeStr(payload.scheduledAt);
+      setDatePart(newLocalDT.slice(0, 10));
+      setHourPart(newLocalDT.slice(11, 13));
+      setMinutePart(newLocalDT.slice(14, 16));
+      setForm((prev) => ({ ...prev, scheduledAt: payload.scheduledAt! }));
+    }
+
+    setMergeOpen(false);
+    showToast({ message: "הפגישה הועברה למועד הקבוע" });
+    router.refresh();
+  }
 
   // Check if status is finalized (not SCHEDULED anymore)
   const isFinalized = form.status !== "SCHEDULED";
@@ -323,6 +362,17 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         danger={false}
         onCancel={() => setFutureWarningOpen(false)}
         onConfirm={() => setFutureWarningOpen(false)}
+      />
+      <ConfirmDialog
+        open={mergeOpen}
+        title="אחוד עם הפגישה הקבועה"
+        message={"יש לך מטופל עם פגישה קבועה שמועדה שונה מהמועד שבחרת.\nהאם לעדכן את הפגישה למועד הקבוע?"}
+        confirmLabel="אחד את הפגישות"
+        cancelLabel="שמור בזמן שנבחר"
+        danger={false}
+        busy={merging}
+        onConfirm={handleMergeWithRecurring}
+        onCancel={() => setMergeOpen(false)}
       />
     </div>
   );
