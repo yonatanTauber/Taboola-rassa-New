@@ -115,13 +115,14 @@ model User {
   defaultSessionFeeNis Int?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  patients        Patient[]
-  inquiries       Inquiry[]
-  tasks           Task[]
-  instructors     Instructor[]
-  createdInvites  InviteCode[] @relation("InviteCodeOwner")
-  usedInvites     InviteCode[] @relation("InviteCodeUsedBy")
-  lifecycleEvents PatientLifecycleEvent[] @relation("PatientLifecycleActor")
+  patients          Patient[]
+  inquiries         Inquiry[]
+  tasks             Task[]
+  instructors       Instructor[]
+  researchDocuments ResearchDocument[]
+  createdInvites    InviteCode[] @relation("InviteCodeOwner")
+  usedInvites       InviteCode[] @relation("InviteCodeUsedBy")
+  lifecycleEvents   PatientLifecycleEvent[] @relation("PatientLifecycleActor")
 }
 
 model InviteCode {
@@ -379,6 +380,7 @@ model Topic {
 
 model ResearchDocument {
   id                String                     @id @default(cuid())
+  ownerUserId       String?
   kind              ResearchItemKind           @default(ARTICLE)
   title             String
   publicationYear   Int?
@@ -390,11 +392,13 @@ model ResearchDocument {
   workspaceNotes    String?
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
+  owner             User?                      @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
   sourceRef         ResearchSource?            @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   authors           ResearchDocumentAuthor[]
   topics            ResearchDocumentTopic[]
   links             ResearchLink[]
 
+  @@index([ownerUserId])
   @@index([createdAt])
 }
 

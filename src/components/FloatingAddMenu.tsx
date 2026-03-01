@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const items = [
-  { href: "/patients", label: "מטופל חדש" },
-  { href: "/sessions", label: "פגישה" },
-  { href: "/sessions", label: "משימה" },
-  { href: "/settings", label: "קבלה" },
-  { href: "/research", label: "פתק חופשי" },
-  { href: "/research", label: "נושא חדש" },
-  { href: "/research", label: "מאמר" },
+  { href: "/patients/new", label: "מטופל חדש" },
+  { href: "/sessions/new", label: "פגישה חדשה" },
+  { href: "/tasks/new", label: "משימה חדשה" },
+  { href: "/receipts/new", label: "קבלה חדשה" },
+  { href: "/research?upload=1", label: "מאמר / מסמך" },
+  { href: "/research", label: "מחקר ומקצוע" },
 ];
 
 export function FloatingAddMenu() {

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { EntityLink } from "@/components/EntityLink";
@@ -35,7 +34,7 @@ type GuidanceLinkRow = {
   instructorName: string | null;
 };
 
-type ModalType = "task" | "receipt" | "guidance" | null;
+type ModalType = "task" | "receipt" | "guidance" | "medical-doc" | null;
 
 export function SessionSidebarPanel({
   sessionId,
@@ -68,6 +67,11 @@ export function SessionSidebarPanel({
 
   // Guidance form state
   const [guidanceTitle, setGuidanceTitle] = useState("");
+
+  // Medical document form state
+  const [medDocTitle, setMedDocTitle] = useState("");
+  const [medDocUrl, setMedDocUrl] = useState("");
+  const [medDocKind, setMedDocKind] = useState("OTHER");
 
   function openModalFor(type: ModalType) {
     if (type === "receipt") setReceiptAmount(feeNis);
@@ -131,6 +135,44 @@ export function SessionSidebarPanel({
         return;
       }
       showToast({ message: "קבלה הופקה בהצלחה" });
+      setOpenModal(null);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createMedicalDoc() {
+    if (!medDocTitle.trim()) {
+      showToast({ message: "חובה להזין כותרת מסמך." });
+      return;
+    }
+    if (!medDocUrl.trim()) {
+      showToast({ message: "חובה להזין קישור לקובץ." });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/medical-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId,
+          sessionId,
+          title: medDocTitle.trim(),
+          filePath: medDocUrl.trim(),
+          kind: medDocKind,
+        }),
+      });
+      if (!res.ok) {
+        const p = (await res.json().catch(() => ({}))) as { error?: string };
+        showToast({ message: p.error ?? "הוספת מסמך נכשלה." });
+        return;
+      }
+      showToast({ message: "מסמך רפואי נוסף בהצלחה" });
+      setMedDocTitle("");
+      setMedDocUrl("");
+      setMedDocKind("OTHER");
       setOpenModal(null);
       router.refresh();
     } finally {
@@ -206,12 +248,13 @@ export function SessionSidebarPanel({
         {/* Medical Documents Section */}
         <div className="mt-5 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-muted">מסמכים רפואיים מקושרים</h3>
-          <Link
-            href={`/medical-documents/new?patientId=${patientId}&sessionId=${sessionId}`}
+          <button
+            type="button"
+            onClick={() => openModalFor("medical-doc")}
             className="app-btn app-btn-secondary px-2 py-1 text-xs"
           >
             +
-          </Link>
+          </button>
         </div>
         <ul className="mb-3 space-y-2 text-sm">
           {medicalDocuments.length > 0 ? (
@@ -413,6 +456,67 @@ export function SessionSidebarPanel({
                     className="app-btn app-btn-primary disabled:opacity-50"
                   >
                     {saving ? "יוצר..." : "צור הדרכה"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {openModal === "medical-doc" && (
+              <>
+                <h3 className="mb-4 text-lg font-semibold">מסמך רפואי חדש</h3>
+                <div className="space-y-3">
+                  <label className="block space-y-1">
+                    <span className="text-xs text-muted">כותרת מסמך</span>
+                    <input
+                      autoFocus
+                      value={medDocTitle}
+                      onChange={(e) => setMedDocTitle(e.target.value)}
+                      className="app-field"
+                      placeholder="לדוגמה: תוצאות בדיקות דם..."
+                    />
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-xs text-muted">סוג מסמך</span>
+                    <select
+                      value={medDocKind}
+                      onChange={(e) => setMedDocKind(e.target.value)}
+                      className="app-select"
+                    >
+                      <option value="OTHER">אחר</option>
+                      <option value="EVALUATION">הערכה</option>
+                      <option value="TEST_RESULT">תוצאות בדיקה</option>
+                      <option value="HOSPITAL_SUMMARY">סיכום אשפוז</option>
+                      <option value="REFERRAL">הפניה</option>
+                    </select>
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-xs text-muted">קישור לקובץ (URL)</span>
+                    <input
+                      type="url"
+                      value={medDocUrl}
+                      onChange={(e) => setMedDocUrl(e.target.value)}
+                      className="app-field"
+                      placeholder="https://..."
+                    />
+                  </label>
+                  <p className="text-xs text-muted">הדבק קישור לקובץ שהועלה (Drive, Dropbox וכד׳).</p>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={saving}
+                    className="app-btn app-btn-secondary"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void createMedicalDoc()}
+                    disabled={saving || !medDocTitle.trim() || !medDocUrl.trim()}
+                    className="app-btn app-btn-primary disabled:opacity-50"
+                  >
+                    {saving ? "שומר..." : "הוסף מסמך"}
                   </button>
                 </div>
               </>

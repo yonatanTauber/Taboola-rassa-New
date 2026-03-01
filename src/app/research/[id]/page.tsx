@@ -19,60 +19,63 @@ export default async function ResearchDocumentPage({ params }: { params: Promise
     orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
   });
   const ownedPatientIds = patients.map((patient) => patient.id);
-  if (ownedPatientIds.length === 0) return notFound();
+
+  // A document is accessible if owned by the user OR linked to one of the user's patients
+  const accessibleDocWhere =
+    ownedPatientIds.length > 0
+      ? {
+          OR: [
+            { ownerUserId: userId },
+            {
+              links: {
+                some: {
+                  targetEntityType: ResearchTargetType.PATIENT,
+                  targetEntityId: { in: ownedPatientIds },
+                },
+              },
+            },
+          ],
+        }
+      : { ownerUserId: userId };
 
   const [document, annotations, topics, otherDocuments] = await Promise.all([
     prisma.researchDocument.findFirst({
-      where: {
-        id,
-        links: {
-          some: {
-            targetEntityType: ResearchTargetType.PATIENT,
-            targetEntityId: { in: ownedPatientIds },
-          },
-        },
-      },
+      where: { id, ...accessibleDocWhere },
       include: {
         authors: { include: { author: true } },
         topics: { include: { topic: true } },
         links: true,
       },
     }),
-    prisma.researchNote.findMany({
-      where: {
-        links: {
-          some: {
-            targetEntityType: ResearchTargetType.RESEARCH_DOCUMENT,
-            targetEntityId: id,
-          },
-        },
-        AND: {
-          links: {
-            some: {
-              targetEntityType: ResearchTargetType.PATIENT,
-              targetEntityId: { in: ownedPatientIds },
+    ownedPatientIds.length > 0
+      ? prisma.researchNote.findMany({
+          where: {
+            links: {
+              some: {
+                targetEntityType: ResearchTargetType.RESEARCH_DOCUMENT,
+                targetEntityId: id,
+              },
+            },
+            AND: {
+              links: {
+                some: {
+                  targetEntityType: ResearchTargetType.PATIENT,
+                  targetEntityId: { in: ownedPatientIds },
+                },
+              },
             },
           },
-        },
-      },
-      include: { links: true },
-      orderBy: { updatedAt: "desc" },
-      take: 200,
-    }),
+          include: { links: true },
+          orderBy: { updatedAt: "desc" },
+          take: 200,
+        })
+      : Promise.resolve([]),
     prisma.topic.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
     prisma.researchDocument.findMany({
-      where: {
-        id: { not: id },
-        links: {
-          some: {
-            targetEntityType: ResearchTargetType.PATIENT,
-            targetEntityId: { in: ownedPatientIds },
-          },
-        },
-      },
+      where: { id: { not: id }, ...accessibleDocWhere },
       select: { id: true, title: true },
       orderBy: { updatedAt: "desc" },
       take: 100,

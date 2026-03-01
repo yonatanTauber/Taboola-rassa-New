@@ -21,6 +21,7 @@ export default async function ResearchPage({
   };
   // If coming from a patient page "add research source" button
   const uploadForPatientId = typeof params.uploadFor === "string" ? params.uploadFor : undefined;
+  const autoOpenUpload = params.upload === "1" || params.upload === "true";
 
   const patients = await prisma.patient.findMany({
     where: { ownerUserId: userId, archivedAt: null },
@@ -30,27 +31,34 @@ export default async function ResearchPage({
   });
   const ownedPatientIds = patients.map((patient) => patient.id);
 
-  const docs =
+  const docsWhere =
     ownedPatientIds.length > 0
-      ? await prisma.researchDocument.findMany({
-          where: {
-            links: {
-              some: {
-                targetEntityType: ResearchTargetType.PATIENT,
-                targetEntityId: { in: ownedPatientIds },
+      ? {
+          OR: [
+            { ownerUserId: userId },
+            {
+              links: {
+                some: {
+                  targetEntityType: ResearchTargetType.PATIENT,
+                  targetEntityId: { in: ownedPatientIds },
+                },
               },
             },
-          },
-          include: {
-            authors: { include: { author: true } },
-            topics: { include: { topic: true } },
-            links: true,
-            sourceRef: true,
-          },
-          orderBy: { createdAt: "desc" },
-          take: 200,
-        })
-      : [];
+          ],
+        }
+      : { ownerUserId: userId };
+
+  const docs = await prisma.researchDocument.findMany({
+    where: docsWhere,
+    include: {
+      authors: { include: { author: true } },
+      topics: { include: { topic: true } },
+      links: true,
+      sourceRef: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
 
   const patientMap = new Map(patients.map((p) => [p.id, p]));
   const authorMap = new Map<string, { id: string; name: string }>();
@@ -97,6 +105,7 @@ export default async function ResearchPage({
       sourcesCatalog={[...sourceMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
       initialFilters={initialFilters}
       uploadForPatientId={uploadForPatientId}
+      autoOpenUpload={autoOpenUpload}
     />
   );
 }

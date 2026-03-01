@@ -51,7 +51,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   useEffect(() => {
     const suggestMerge = searchParams.get("suggestMerge") === "true";
     if (suggestMerge) {
-      setMergeOpen(true);
+      setTimeout(() => setMergeOpen(true), 0);
     }
   }, [searchParams]);
 
@@ -121,6 +121,9 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
       }
     }
 
+    const normalizedFee =
+      nextStatus === "CANCELED" ? 0 : form.feeNis === "" ? "" : Number(form.feeNis);
+
     const res = await fetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -128,7 +131,7 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         ...form,
         status: nextStatus,
         scheduledAt: scheduledAtUTC,
-        feeNis: form.feeNis === "" ? "" : Number(form.feeNis),
+        feeNis: normalizedFee,
       }),
     });
     if (!res.ok) return;
@@ -184,13 +187,14 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
     const res = await fetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "CANCELED" }),
+      body: JSON.stringify({ status: "CANCELED", feeNis: 0 }),
     });
     setCanceling(false);
     if (!res.ok) {
       showToast({ message: "ביטול פגישה נכשל" });
       return;
     }
+    setForm((prev) => ({ ...prev, status: "CANCELED", feeNis: "0" }));
     showToast({ message: "הפגישה סומנה כמבוטלת" });
     router.back();
     router.refresh();
@@ -210,13 +214,13 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
           />
           <div className="grid grid-cols-2 gap-2">
             <select
-              value={minutePart}
-              onChange={(e) => setMinutePart(e.target.value)}
+              value={hourPart}
+              onChange={(e) => setHourPart(e.target.value)}
               className="app-select"
               disabled={isReadOnly}
             >
-              {Array.from({ length: 12 }).map((_, idx) => {
-                const value = String(idx * 5).padStart(2, "0");
+              {Array.from({ length: 24 }).map((_, hour) => {
+                const value = String(hour).padStart(2, "0");
                 return (
                   <option key={value} value={value}>
                     {value}
@@ -225,13 +229,13 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
               })}
             </select>
             <select
-              value={hourPart}
-              onChange={(e) => setHourPart(e.target.value)}
+              value={minutePart}
+              onChange={(e) => setMinutePart(e.target.value)}
               className="app-select"
               disabled={isReadOnly}
             >
-              {Array.from({ length: 24 }).map((_, hour) => {
-                const value = String(hour).padStart(2, "0");
+              {Array.from({ length: 12 }).map((_, idx) => {
+                const value = String(idx * 5).padStart(2, "0");
                 return (
                   <option key={value} value={value}>
                     {value}
