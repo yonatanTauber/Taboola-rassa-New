@@ -67,6 +67,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     expectedTime?: Date;
     timeDifference?: number;
   } | null>(null);
+  const [pendingMergeId, setPendingMergeId] = useState<string | null>(null);
 
   const closeMenuWithAnimation = useCallback(() => {
     if (!openMenu) return;
@@ -156,6 +157,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
         hour: prefill?.hour ?? base.hour,
         minute: prefill?.minute ?? base.minute,
       });
+      setPendingMergeId(null);
     }
     if (type === "task") {
       const base = defaultTaskForm();
@@ -264,6 +266,12 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
       location: sessionForm.location,
       note: sessionForm.note,
     };
+
+    // If user chose to merge with a recurring session, delete it first
+    if (pendingMergeId) {
+      await fetch(`/api/sessions/${pendingMergeId}`, { method: "DELETE" });
+      setPendingMergeId(null);
+    }
 
     const res = await fetch("/api/sessions", {
       method: "POST",
@@ -704,6 +712,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
         onConfirm={() => {
           setDirtyCloseOpen(false);
           setIsDirty(false);
+          setPendingMergeId(null);
           setOpenAction(null);
         }}
       />
@@ -727,31 +736,33 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
             </p>
             <div className="flex gap-2">
               <button
-                onClick={async () => {
-                  if (!mergeSuggestion.mergeCandidateId) return;
-                  try {
-                    // Perform merge by deleting the new session in favor of the existing one
-                    setMergeSuggestion(null);
-                    showToast({ message: "הטיפולים אוחדו בהצלחה", durationMs: 3000 });
-                    setIsDirty(false);
-                    setOpenAction(null);
-                    router.refresh();
-                  } catch (error) {
-                    showToast({ message: "שגיאה באיחוד הטיפולים. נסה שוב." });
+                onClick={() => {
+                  // Update form date/time to the recurring session's expected time
+                  const expected = mergeSuggestion.expectedTime;
+                  if (expected) {
+                    setSessionForm((prev) => ({
+                      ...prev,
+                      date: expected.toISOString().slice(0, 10),
+                      hour: String(expected.getHours()),
+                      minute: String(expected.getMinutes()).padStart(2, "0"),
+                    }));
                   }
+                  // Remember to delete the recurring template on submit
+                  setPendingMergeId(mergeSuggestion.mergeCandidateId ?? null);
+                  setMergeSuggestion(null); // close dialog only — form stays open
                 }}
                 className="app-btn app-btn-primary flex-1"
               >
-                כן, אחד אותם
+                עדכן לשעה הקבועה
               </button>
               <button
                 onClick={() => {
-                  setMergeSuggestion(null);
-                  performCreateSession();
+                  setPendingMergeId(null);
+                  setMergeSuggestion(null); // close dialog only — form stays open
                 }}
                 className="app-btn app-btn-secondary flex-1"
               >
-                לא, שמור בנפרד
+                שמור בשעה שבחרתי
               </button>
             </div>
           </div>

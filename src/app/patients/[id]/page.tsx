@@ -344,6 +344,7 @@ export default async function PatientDetailsPage({
             title: guidance.title,
             scheduledAt: guidance.scheduledAt ? guidance.scheduledAt.toISOString() : null,
             instructorName: guidance.instructor?.fullName ?? null,
+            instructorId: guidance.instructorId ?? null,
           }))}
           notes={patient.patientNotes.map((note) => ({ id: note.id, title: note.title, content: note.content }))}
         />

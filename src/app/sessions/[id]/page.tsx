@@ -15,7 +15,11 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
   const session = await prisma.session.findFirst({
     where: { id, patient: { ownerUserId: userId } },
     include: {
-      patient: true,
+      patient: {
+        include: {
+          figures: { select: { name: true } },
+        },
+      },
       sessionNote: true,
       tasks: true,
       paymentAllocations: {
@@ -48,11 +52,13 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
         <SessionEditor
           session={{
             id: session.id,
+            patientId: session.patient.id,
             status: session.status,
             location: session.location ?? "",
             feeNis: session.feeNis ? String(session.feeNis) : "",
             scheduledAt: toDateTimeInput(session.scheduledAt),
             note: session.sessionNote?.markdown ?? "",
+            existingFigureNames: session.patient.figures.map((f) => f.name),
           }}
         />
 

@@ -60,6 +60,10 @@ export function ResearchWorkspace({
     () => [...new Set(docs.flatMap((doc) => doc.authors).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")),
     [docs],
   );
+  const authorNameToId = useMemo(
+    () => new Map(authorsCatalog.map((a) => [a.name, a.id])),
+    [authorsCatalog],
+  );
 
   const filtered = useMemo(() => {
     return docs.filter((doc) => {
@@ -179,7 +183,26 @@ export function ResearchWorkspace({
               <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-muted">{kindLabel(doc.kind)}</span>
             </div>
             <p className="text-xs text-muted">מקור: {doc.source ?? "לא צוין"}</p>
-            <p className="text-xs text-muted">כותבים: {doc.authors.length ? doc.authors.join(", ") : "לא צוינו"}</p>
+            <p className="text-xs text-muted">
+              כותבים:{" "}
+              {doc.authors.length
+                ? doc.authors.map((name, i) => {
+                    const authorId = authorNameToId.get(name);
+                    return (
+                      <span key={name}>
+                        {i > 0 && ", "}
+                        {authorId ? (
+                          <Link href={`/authors/${authorId}`} className="text-accent hover:underline">
+                            {name}
+                          </Link>
+                        ) : (
+                          name
+                        )}
+                      </span>
+                    );
+                  })
+                : "לא צוינו"}
+            </p>
             <p className="text-xs text-muted">נושאים: {doc.topics.length ? doc.topics.join(", ") : "ללא"}</p>
             {doc.linkedPatients.length > 0 ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">

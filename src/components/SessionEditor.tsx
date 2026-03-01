@@ -8,11 +8,13 @@ import { useQuickActions } from "@/components/QuickActions";
 
 type SessionPayload = {
   id: string;
+  patientId: string;
   status: string;
   location: string;
   feeNis: string;
   scheduledAt: string;
   note: string;
+  existingFigureNames: string[];
 };
 
 export function SessionEditor({ session }: { session: SessionPayload }) {
@@ -27,6 +29,8 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [undocumentedConfirmOpen, setUndocumentedConfirmOpen] = useState(false);
+  const [detectedNames, setDetectedNames] = useState<string[]>([]);
+  const [addingFigures, setAddingFigures] = useState(false);
 
   async function save(allowUndocumented = false) {
     const scheduled = new Date(`${datePart}T${hourPart}:${minutePart}`);
@@ -86,8 +90,55 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         router.refresh();
       },
     });
-    router.back();
-    router.refresh();
+
+    // After successful save, detect new names in the note before navigating
+    if (hasNote) {
+      void detectNames(form.note); // detectNames handles navigation
+    } else {
+      router.back();
+      router.refresh();
+    }
+  }
+
+  async function detectNames(markdown: string) {
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/detect-names`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown,
+          existingFigureNames: session.existingFigureNames,
+        }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { suggestedNames: string[] };
+      if (data.suggestedNames.length > 0) {
+        setDetectedNames(data.suggestedNames);
+      } else {
+        // No new names — navigate as normal
+        router.back();
+        router.refresh();
+      }
+    } catch {
+      router.back();
+      router.refresh();
+    }
+  }
+
+  async function handleAddFigures() {
+    setAddingFigures(true);
+    try {
+      await fetch(`/api/patients/${session.patientId}/figures`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names: detectedNames }),
+      });
+    } finally {
+      setAddingFigures(false);
+      setDetectedNames([]);
+      router.back();
+      router.refresh();
+    }
   }
 
   async function deleteSession() {
@@ -167,6 +218,36 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
         <input value={form.feeNis} onChange={(e) => setForm((p) => ({ ...p, feeNis: e.target.value }))} placeholder="מחיר" className="app-field" />
       </div>
       <textarea value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="תוכן הפגישה" className="app-textarea min-h-32" />
+
+      {detectedNames.length > 0 && (
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm">
+          <p className="font-medium text-yellow-800">
+            זוהו שמות חדשים: {detectedNames.join(", ")}
+          </p>
+          <p className="mt-0.5 text-xs text-yellow-700">להוסיף כדמויות למטופל?</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void handleAddFigures()}
+              disabled={addingFigures}
+              className="app-btn app-btn-primary text-xs"
+            >
+              {addingFigures ? "מוסיף..." : "הוסף כדמויות"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDetectedNames([]);
+                router.back();
+                router.refresh();
+              }}
+              className="app-btn app-btn-secondary text-xs"
+            >
+              דחה
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">

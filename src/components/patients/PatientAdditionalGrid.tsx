@@ -18,7 +18,7 @@ type LinkedResearchNoteRow = {
   documentTitle: string | null;
 };
 type NoteRow = { id: string; title: string; content: string };
-type GuidanceRow = { id: string; title: string; scheduledAt: string | null; instructorName: string | null };
+type GuidanceRow = { id: string; title: string; scheduledAt: string | null; instructorName: string | null; instructorId?: string | null };
 
 type ActiveNote = {
   kind: "research" | "patient";
@@ -215,12 +215,19 @@ export function PatientAdditionalGrid({
             {guidances.length > 0 ? (
               <ul className="space-y-1 text-sm">
                 {guidances.slice(0, 10).map((guidance) => (
-                  <li key={guidance.id}>
+                  <li key={guidance.id} className="flex items-center gap-1.5">
                     <EntityLink
                       type="guidance"
                       id={guidance.id}
-                      label={`${guidance.title}${guidance.scheduledAt ? ` · ${new Date(guidance.scheduledAt).toLocaleDateString("he-IL")}` : ""}${guidance.instructorName ? ` · ${guidance.instructorName}` : ""}`}
+                      label={`${guidance.title}${guidance.scheduledAt ? ` · ${new Date(guidance.scheduledAt).toLocaleDateString("he-IL")}` : ""}`}
                     />
+                    {guidance.instructorName && guidance.instructorId ? (
+                      <Link href={`/instructors/${guidance.instructorId}`} className="text-xs text-muted hover:text-accent hover:underline">
+                        · {guidance.instructorName}
+                      </Link>
+                    ) : guidance.instructorName ? (
+                      <span className="text-xs text-muted">· {guidance.instructorName}</span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -233,7 +240,14 @@ export function PatientAdditionalGrid({
             {figures.length > 0 ? (
               <ul className="space-y-1 text-sm">
                 {figures.slice(0, 12).map((figure) => (
-                  <li key={figure.id} className="text-ink">{figure.name}</li>
+                  <li key={figure.id}>
+                    <Link
+                      href={`/figures/${figure.id}`}
+                      className="text-accent hover:underline"
+                    >
+                      {figure.name}
+                    </Link>
+                  </li>
                 ))}
               </ul>
             ) : (

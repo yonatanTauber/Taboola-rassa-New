@@ -176,7 +176,7 @@ export default async function Home() {
               <MiniStat label="משימות פתוחות" value={openTasksCount} href="/tasks" hoverLabel="מעבר למשימות פתוחות" />
               <MiniStat label="ביטולים מאוחרים" value={lateCanceledCount} href="/sessions" hoverLabel="מעבר לביטולים מאוחרים" />
             </div>
-            <Link href={insight.href} className="rounded-2xl border border-accent/20 bg-gradient-to-l from-accent-soft to-white px-4 py-3 text-sm text-accent transition hover:translate-y-[-1px]">
+            <Link href={insight.href} className="block rounded-2xl border border-accent/20 bg-gradient-to-l from-accent-soft to-white px-4 py-3 text-sm text-accent transition hover:translate-y-[-1px]">
               <div className="mb-1 flex items-center gap-2 font-medium">
                 <span className="inline-block size-2 rounded-full bg-accent" />
                 תובנה יומית
