@@ -5,11 +5,53 @@ import { useMemo, useState } from "react";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import { formatPatientName } from "@/lib/patient-name";
 
+// Helper: calculate next occurrence of weekday (0=Sun, 6=Sat) in Israel timezone
+function getNextRecurringDate(fixedSessionDay: number, fixedSessionTime: string): { date: string; time: string; dayName: string } {
+  const TZ = "Asia/Jerusalem";
+
+  // Convert UI day (1=Sun, 0=Sat) to 0-indexed (0=Sun, 6=Sat)
+  const targetWeekday = ((fixedSessionDay - 1) + 7) % 7;
+
+  // Get current date in Israel timezone
+  const now = new Date();
+  const dateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    dateStyle: "short",
+  }).format(now);
+
+  // Helper: get weekday (0=Sun, 6=Sat) in Israel timezone
+  function getIsraelWeekday(date: Date): number {
+    const dayName = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short" }).format(date);
+    const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return days[dayName] ?? 0;
+  }
+
+  const current = new Date(`${dateStr}T00:00:00Z`);
+  const currentWeekday = getIsraelWeekday(current);
+
+  let dayDiff = (targetWeekday - currentWeekday + 7) % 7;
+  if (dayDiff === 0) dayDiff = 7; // Always next week's occurrence
+
+  const nextDate = new Date(current);
+  nextDate.setUTCDate(nextDate.getUTCDate() + dayDiff);
+
+  const nextDateStr = nextDate.toISOString().slice(0, 10);
+  const dayName = new Date(`${nextDateStr}T12:00:00Z`).toLocaleDateString("he-IL", { weekday: "long" });
+
+  return {
+    date: nextDateStr,
+    time: fixedSessionTime,
+    dayName,
+  };
+}
+
 type PatientOption = {
   id: string;
   firstName: string;
   lastName: string;
   defaultSessionFeeNis: number | null;
+  fixedSessionDay: number | null;
+  fixedSessionTime: string | null;
 };
 
 type FutureSessionOption = {
@@ -54,6 +96,13 @@ export function SessionCreateForm({
     [futureSessions, patientId],
   );
 
+  const recurringSessionSuggestion = useMemo(() => {
+    if (!selectedPatient?.fixedSessionDay || !selectedPatient?.fixedSessionTime) {
+      return null;
+    }
+    return getNextRecurringDate(selectedPatient.fixedSessionDay, selectedPatient.fixedSessionTime);
+  }, [selectedPatient]);
+
   return (
     <form action={action} className="space-y-3">
       {error ? <div className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</div> : null}
@@ -74,6 +123,33 @@ export function SessionCreateForm({
           ))}
         </select>
       </label>
+
+      {recurringSessionSuggestion ? (
+        <div className="rounded-xl border border-blue-300/50 bg-blue-50/80 p-3 text-sm">
+          <div className="mb-2 font-semibold text-blue-800">
+            🗓️ פגישה שבועית קבועה
+          </div>
+          <div className="mb-3 text-blue-700">
+            <strong>{recurringSessionSuggestion.dayName}</strong> בשעה{" "}
+            <strong>{recurringSessionSuggestion.time}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDateValue(recurringSessionSuggestion.date);
+              // Also update the time input by finding it and setting value
+              const timeInput = document.querySelector('input[name="time"]') as HTMLInputElement;
+              if (timeInput) {
+                timeInput.value = recurringSessionSuggestion.time;
+              }
+            }}
+            className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            ← השתמש בזמן הקבוע
+          </button>
+        </div>
+      ) : null}
+
       {patientFutureSessions.length > 0 ? (
         <div className="rounded-xl border border-amber-300/50 bg-amber-50/80 p-3 text-sm">
           <div className="mb-1 font-semibold text-amber-800">נמצאו פגישות עתידיים למטופל</div>

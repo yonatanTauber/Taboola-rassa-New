@@ -120,7 +120,14 @@ export default async function NewSessionPage({
 
   const patients = await prisma.patient.findMany({
     where: { ownerUserId: userId, archivedAt: null },
-    select: { id: true, firstName: true, lastName: true, defaultSessionFeeNis: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      defaultSessionFeeNis: true,
+      fixedSessionDay: true,
+      fixedSessionTime: true,
+    },
     orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     take: 400,
   });
@@ -149,7 +156,14 @@ export default async function NewSessionPage({
           </div>
         ) : null}
         <SessionCreateForm
-          patients={patients}
+          patients={patients.map((p) => ({
+            id: p.id,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            defaultSessionFeeNis: p.defaultSessionFeeNis,
+            fixedSessionDay: p.fixedSessionDay,
+            fixedSessionTime: p.fixedSessionTime,
+          }))}
           initialPatientId={selected?.id ?? ""}
           initialDate={toDateInput(now)}
           initialTime={toTimeInput(now)}
