@@ -30,6 +30,7 @@ export function ResearchWorkspace({
   topicsCatalog,
   sourcesCatalog,
   initialFilters,
+  uploadForPatientId,
 }: {
   docs: Doc[];
   patients: Option[];
@@ -37,6 +38,7 @@ export function ResearchWorkspace({
   topicsCatalog: Option[];
   sourcesCatalog: Option[];
   initialFilters: { q: string; kind: string; topic: string; author: string };
+  uploadForPatientId?: string;
 }) {
   const router = useRouter();
   const [q, setQ] = useState(initialFilters.q);
@@ -44,7 +46,8 @@ export function ResearchWorkspace({
   const [topic, setTopic] = useState(initialFilters.topic);
   const [author, setAuthor] = useState(initialFilters.author);
   const [linkedOnly, setLinkedOnly] = useState(false);
-  const [openUpload, setOpenUpload] = useState(false);
+  // Auto-open upload panel when arriving from a patient page
+  const [openUpload, setOpenUpload] = useState(!!uploadForPatientId);
 
   const topicOptions = useMemo(
     () => [...new Set(docs.flatMap((doc) => doc.topics).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")),
@@ -203,6 +206,7 @@ export function ResearchWorkspace({
                 authorsCatalog={authorsCatalog}
                 topicsCatalog={topicsCatalog}
                 sourcesCatalog={sourcesCatalog}
+                defaultPatientId={uploadForPatientId}
               />
             </div>
           </div>

@@ -1,6 +1,12 @@
+import { FigureRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
+
+const VALID_ROLES: FigureRole[] = [
+  "MOTHER", "FATHER", "SISTER", "BROTHER", "PARTNER",
+  "FRIEND", "COLLEAGUE", "ACQUAINTANCE", "OTHER",
+];
 
 export async function GET(
   _req: Request,
@@ -10,15 +16,15 @@ export async function GET(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const note = await prisma.patientNote.findFirst({
+  const figure = await prisma.patientFigure.findFirst({
     where: { id, patient: { ownerUserId: userId } },
     include: {
       patient: { select: { id: true, firstName: true, lastName: true } },
     },
   });
-  if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!figure) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json({ note });
+  return NextResponse.json({ figure });
 }
 
 export async function PATCH(
@@ -28,24 +34,28 @@ export async function PATCH(
   const userId = await requireCurrentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const body = (await req.json()) as { title?: string; content?: string };
 
-  const existing = await prisma.patientNote.findFirst({
+  const body = (await req.json()) as { name?: string; role?: string; notes?: string };
+
+  const existing = await prisma.patientFigure.findFirst({
     where: { id, patient: { ownerUserId: userId } },
-    select: { id: true },
+    select: { id: true, name: true, role: true, notes: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const content = typeof body.content === "string" ? body.content : "";
-  if (!title) return NextResponse.json({ error: "חובה להזין כותרת" }, { status: 400 });
+  const name = typeof body.name === "string" ? body.name.trim() : existing.name;
+  const roleRaw = typeof body.role === "string" ? body.role.trim().toUpperCase() : existing.role;
+  const role: FigureRole = VALID_ROLES.includes(roleRaw as FigureRole) ? (roleRaw as FigureRole) : "OTHER";
+  const notes = typeof body.notes === "string" ? (body.notes.trim() || null) : existing.notes;
 
-  const updated = await prisma.patientNote.update({
+  if (!name) return NextResponse.json({ error: "חובה להזין שם" }, { status: 400 });
+
+  const updated = await prisma.patientFigure.update({
     where: { id },
-    data: { title, content },
+    data: { name, role, notes },
   });
 
-  return NextResponse.json({ ok: true, note: updated });
+  return NextResponse.json({ ok: true, figure: updated });
 }
 
 export async function DELETE(
@@ -56,12 +66,12 @@ export async function DELETE(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const existing = await prisma.patientNote.findFirst({
+  const existing = await prisma.patientFigure.findFirst({
     where: { id, patient: { ownerUserId: userId } },
     select: { id: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.patientNote.delete({ where: { id } });
+  await prisma.patientFigure.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

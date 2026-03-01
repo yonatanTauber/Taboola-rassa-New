@@ -17,12 +17,14 @@ export function ResearchUploadPanel({
   topicsCatalog,
   sourcesCatalog,
   inModal = false,
+  defaultPatientId = "",
 }: {
   patients: PatientOption[];
   authorsCatalog: Option[];
   topicsCatalog: Option[];
   sourcesCatalog: Option[];
   inModal?: boolean;
+  defaultPatientId?: string;
 }) {
   const router = useRouter();
   const { showToast } = useQuickActions();
@@ -39,7 +41,7 @@ export function ResearchUploadPanel({
   const [topics, setTopics] = useState("");
   const [topicPick, setTopicPick] = useState("");
   const [topicCustom, setTopicCustom] = useState("");
-  const [patientId, setPatientId] = useState("");
+  const [patientId, setPatientId] = useState(defaultPatientId);
   const [kind, setKind] = useState("ARTICLE");
   const [externalUrl, setExternalUrl] = useState("");
   const [suggested, setSuggested] = useState(false);

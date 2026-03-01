@@ -19,6 +19,8 @@ export default async function ResearchPage({
     topic: typeof params.topic === "string" ? params.topic : "ALL",
     author: typeof params.author === "string" ? params.author : "ALL",
   };
+  // If coming from a patient page "add research source" button
+  const uploadForPatientId = typeof params.uploadFor === "string" ? params.uploadFor : undefined;
 
   const patients = await prisma.patient.findMany({
     where: { ownerUserId: userId, archivedAt: null },
@@ -94,6 +96,7 @@ export default async function ResearchPage({
       topicsCatalog={[...topicMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
       sourcesCatalog={[...sourceMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
       initialFilters={initialFilters}
+      uploadForPatientId={uploadForPatientId}
     />
   );
 }

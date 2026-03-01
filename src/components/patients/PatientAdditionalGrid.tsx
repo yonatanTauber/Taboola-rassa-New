@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+// Patient notes navigate to /patient-notes/[id] (standalone page)
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EntityLink } from "@/components/EntityLink";
 import { PatientProfileEditor } from "@/components/patients/PatientProfileEditor";
@@ -195,10 +196,15 @@ export function PatientAdditionalGrid({
         showToast({ message: p?.error ?? "יצירת פתק נכשלה." });
         return;
       }
-      showToast({ message: "פתק נוצר" });
+      const data = await res.json() as { note?: { id: string } };
       setNoteTitle(""); setNoteContent("");
       setOpenModal(null);
-      router.refresh();
+      // Navigate to the standalone note page
+      if (data.note?.id) {
+        router.push(`/patient-notes/${data.note.id}`);
+      } else {
+        router.refresh();
+      }
     } finally {
       setSaving(false);
     }
@@ -421,13 +427,18 @@ export function PatientAdditionalGrid({
             {figures.length > 0 ? (
               <ul className="space-y-1 text-sm">
                 {figures.slice(0, 12).map((figure) => (
-                  <li key={figure.id} className="flex items-center gap-2">
-                    <span className="text-ink">{figure.name}</span>
-                    {figure.role && figure.role !== "OTHER" && (
-                      <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[10px] text-muted">
-                        {FIGURE_ROLE_LABELS[figure.role] ?? figure.role}
-                      </span>
-                    )}
+                  <li key={figure.id}>
+                    <Link
+                      href={`/figures/${figure.id}`}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-black/[0.03]"
+                    >
+                      <span className="text-accent">{figure.name}</span>
+                      {figure.role && figure.role !== "OTHER" && (
+                        <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[10px] text-muted">
+                          {FIGURE_ROLE_LABELS[figure.role] ?? figure.role}
+                        </span>
+                      )}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -454,14 +465,13 @@ export function PatientAdditionalGrid({
                 ))}
                 {notes.slice(0, 8).map((note) => (
                   <li key={note.id}>
-                    <button
-                      type="button"
-                      onClick={() => openNote({ kind: "patient", id: note.id, title: note.title, content: note.content })}
+                    <Link
+                      href={`/patient-notes/${note.id}`}
                       className="flex w-full items-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-right transition hover:bg-black/[0.02]"
                     >
                       <span className="min-w-0 flex-1 truncate text-accent">{note.title}</span>
                       <span className="text-xs text-muted">פתח</span>
-                    </button>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -471,7 +481,19 @@ export function PatientAdditionalGrid({
           </BlockWithAdd>
 
           {/* External links block */}
-          <BlockWithAdd title="מקורות וקישורים חיצוניים" onAdd={() => openModalFor("link")}>
+          <BlockWithAdd
+            title="מקורות וקישורים חיצוניים"
+            onAdd={() => openModalFor("link")}
+            extraAction={
+              <Link
+                href={`/research?uploadFor=${patientId}`}
+                className="app-btn app-btn-secondary px-2 py-0.5 text-xs leading-none"
+                title="הוסף מקור מחקרי"
+              >
+                + מחקר
+              </Link>
+            }
+          >
             {conceptLinks.length > 0 ? (
               <ul className="space-y-1 text-sm">
                 {conceptLinks.map((link) => (
@@ -750,12 +772,25 @@ function InfoCard({ title, text }: { title: string; text: string }) {
   );
 }
 
-function BlockWithAdd({ title, children, onAdd }: { title: string; children: React.ReactNode; onAdd: () => void }) {
+function BlockWithAdd({
+  title,
+  children,
+  onAdd,
+  extraAction,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onAdd: () => void;
+  extraAction?: React.ReactNode;
+}) {
   return (
     <section className="rounded-xl border border-black/12 bg-white/90 p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-1">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <button type="button" onClick={onAdd} className="app-btn app-btn-secondary px-2 py-0.5 text-xs leading-none">+</button>
+        <div className="flex items-center gap-1">
+          {extraAction}
+          <button type="button" onClick={onAdd} className="app-btn app-btn-secondary px-2 py-0.5 text-xs leading-none">+</button>
+        </div>
       </div>
       {children}
     </section>
