@@ -124,15 +124,16 @@ export function detectPotentialMerge(
   // Get the weekday of the new session in Israel timezone
   const newSessionWeekday = getIsraelWeekday(newSessionDate);
 
-  // Check if new session is on a different day than the recurring day but in the same week
-  // A week is: Sunday (0) = start, Saturday (6) = end
-  // Logic: if new session is not on the recurring day AND within 7 days, suggest merge
+  // Calculate days difference between new session and the recurring session's expected date
   const daysDiff = Math.abs(expectedDate.getTime() - newSessionDate.getTime()) / (1000 * 60 * 60 * 24);
 
-  if (
-    newSessionWeekday !== targetWeekday && // Different day than recurring
-    daysDiff < 7 // Within the same calendar week (Sun-Sat)
-  ) {
+  // Suggest merge if:
+  // 1. User is creating a session on the SAME DAY as recurring day (should merge to recurring time)
+  // 2. OR user is creating on a DIFFERENT DAY in the same week (offer merge option)
+  const isSameDay = newSessionWeekday === targetWeekday;
+  const isSameWeek = daysDiff < 7;
+
+  if (isSameDay || isSameWeek) {
     return {
       shouldMerge: true,
       mergeCandidateId: undefined,
