@@ -25,6 +25,7 @@ export default async function AuthorDetailPage({
     where: { id },
     include: {
       documentAuthors: {
+        where: { document: { ownerUserId: userId } },
         include: {
           document: {
             select: { id: true, title: true, kind: true, createdAt: true, externalUrl: true },
