@@ -121,23 +121,23 @@ export function detectPotentialMerge(
   const expectedTime = buildIsraelDateTime(expectedDateStr, fixedHour, fixedMinute);
   const newTime = buildIsraelDateTime(newDateStr, newSessionHour, newSessionMinute);
 
-  const diffSeconds = Math.abs(newTime.getTime() - expectedTime.getTime()) / 1000;
-  const MERGE_THRESHOLD_SECONDS = 30 * 60; // 30 minutes
+  // Get the weekday of the new session in Israel timezone
+  const newSessionWeekday = getIsraelWeekday(newSessionDate);
 
-  if (diffSeconds <= MERGE_THRESHOLD_SECONDS) {
-    // Time is close enough — check if we should suggest same-day merge
-    const sameDayCandidate = existingSessions.find(
-      (s) =>
-        toIsraelDateStr(s.scheduledAt) === newDateStr &&
-        Math.abs(s.scheduledAt.getTime() - newTime.getTime()) <=
-          MERGE_THRESHOLD_SECONDS * 1000
-    );
+  // Check if new session is on a different day than the recurring day but in the same week
+  // A week is: Sunday (0) = start, Saturday (6) = end
+  // Logic: if new session is not on the recurring day AND within 7 days, suggest merge
+  const daysDiff = Math.abs(expectedDate.getTime() - newSessionDate.getTime()) / (1000 * 60 * 60 * 24);
 
+  if (
+    newSessionWeekday !== targetWeekday && // Different day than recurring
+    daysDiff < 7 // Within the same calendar week (Sun-Sat)
+  ) {
     return {
       shouldMerge: true,
-      mergeCandidateId: sameDayCandidate?.id,
+      mergeCandidateId: undefined,
       expectedTime,
-      timeDifference: diffSeconds,
+      timeDifference: 0,
     };
   }
 
