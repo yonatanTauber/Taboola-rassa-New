@@ -101,7 +101,6 @@ export async function POST(req: Request) {
 
     const doc = await prisma.researchDocument.create({
       data: {
-        owner: { connect: { id: userId } },
         kind,
         title,
         source: source || null,

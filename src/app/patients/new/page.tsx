@@ -120,7 +120,7 @@ async function createPatient(formData: FormData) {
         internalCode,
         firstName,
         lastName,
-        phone: phone || null,
+        phone: phone || "",
         email: email || null,
         gender: gender === "MALE" || gender === "FEMALE" || gender === "OTHER" ? gender : "OTHER",
         researchAlias: `P-${Math.floor(Math.random() * 1_000_000)

@@ -126,7 +126,6 @@ export default async function InquiriesPage() {
                       <InquiryStatusField
                         inquiryId={inquiry.id}
                         initialStatus={inquiry.status}
-                        patientId={inquiry.patient?.id ?? inquiry.patientId ?? null}
                       />
                     </td>
                     <td className="p-2">
