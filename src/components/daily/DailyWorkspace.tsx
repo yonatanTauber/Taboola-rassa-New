@@ -30,7 +30,7 @@ function todayIso() {
 function initialDraft(): DraftState {
   return {
     rawText: "",
-    parsedType: DailyEntryType.UNKNOWN,
+    parsedType: DailyEntryType.SESSION,
     matchedPatientId: "",
     matchedPatientName: "",
     entryDate: todayIso(),
@@ -57,15 +57,29 @@ export function DailyWorkspace({
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(todayIso());
   const [draft, setDraft] = useState<DraftState>(initialDraft());
   const [entries, setEntries] = useState<DailyEntryViewModel[]>(initialEntries);
 
   const patientOptions = useMemo(() => [{ value: "", label: "ללא שיוך" }, ...patients.map((p) => ({ value: p.id, label: p.label }))], [patients]);
+  const entriesForSelectedDay = useMemo(
+    () =>
+      entries
+        .filter((entry) => entry.entryDate === selectedDate)
+        .sort((a, b) => {
+          const aTime = new Date(a.updatedAt).getTime();
+          const bTime = new Date(b.updatedAt).getTime();
+          return bTime - aTime;
+        }),
+    [entries, selectedDate],
+  );
+
+  const selectedDateLabel = useMemo(() => formatDayDateLabel(selectedDate), [selectedDate]);
 
   function applyParseResult(result: DailyParseResult, rawText: string) {
     setDraft({
       rawText,
-      parsedType: result.type,
+      parsedType: DailyEntryType.SESSION,
       matchedPatientId: result.matchedPatientId ?? "",
       matchedPatientName: result.matchedPatientName ?? result.patientName ?? "",
       entryDate: result.date,
@@ -94,11 +108,11 @@ export function DailyWorkspace({
         showToast({ message: payload.error ?? "ניתוח נכשל. עוברים לעריכה ידנית." });
         applyParseResult(
           {
-            type: DailyEntryType.UNKNOWN,
+            type: DailyEntryType.SESSION,
             patientName: null,
             matchedPatientId: null,
             matchedPatientName: null,
-            date: todayIso(),
+            date: selectedDate,
             time: null,
             content: raw,
             title: null,
@@ -120,11 +134,11 @@ export function DailyWorkspace({
       showToast({ message: "שגיאת רשת בניתוח. עוברים לעריכה ידנית." });
       applyParseResult(
         {
-          type: DailyEntryType.UNKNOWN,
+          type: DailyEntryType.SESSION,
           patientName: null,
           matchedPatientId: null,
           matchedPatientName: null,
-          date: todayIso(),
+          date: selectedDate,
           time: null,
           content: raw,
           title: null,
@@ -149,7 +163,7 @@ export function DailyWorkspace({
     try {
       const payload = {
         rawText: draft.rawText,
-        parsedType: draft.parsedType,
+        parsedType: DailyEntryType.SESSION,
         status,
         matchedPatientId: draft.matchedPatientId || null,
         matchedPatientName: draft.matchedPatientName || null,
@@ -202,8 +216,8 @@ export function DailyWorkspace({
   }
 
   async function commitEntry() {
-    if ((draft.parsedType === DailyEntryType.SESSION || draft.parsedType === DailyEntryType.GUIDANCE) && !draft.matchedPatientId) {
-      showToast({ message: "בטיפול/הדרכה חובה לבחור מטופל." });
+    if (!draft.matchedPatientId) {
+      showToast({ message: "בטיפול חובה לבחור מטופל." });
       return;
     }
     if (!draft.entryDate) {
@@ -227,7 +241,7 @@ export function DailyWorkspace({
       showToast({ message: "הרשומה נוצרה בהצלחה." });
       await reloadEntries();
       setText("");
-      setDraft(initialDraft());
+      setDraft(emptyDraftForDate(selectedDate));
       setActiveEntryId(null);
       router.push(targetHref(payload.targetEntityType, payload.targetEntityId));
     } finally {
@@ -255,10 +269,11 @@ export function DailyWorkspace({
 
   function openEntryForEdit(entry: DailyEntryViewModel) {
     setActiveEntryId(entry.id);
+    setSelectedDate(entry.entryDate);
     setText(entry.rawText);
     setDraft({
       rawText: entry.rawText,
-      parsedType: entry.parsedType,
+      parsedType: DailyEntryType.SESSION,
       matchedPatientId: entry.matchedPatientId ?? "",
       matchedPatientName: entry.matchedPatientName ?? "",
       entryDate: entry.entryDate,
@@ -270,14 +285,36 @@ export function DailyWorkspace({
       parseMetaJson: null,
     });
   }
-
-  const todayLabel = new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
+  function moveDay(direction: -1 | 1) {
+    const nextDate = shiftIsoDate(selectedDate, direction);
+    setSelectedDate(nextDate);
+    setActiveEntryId(null);
+    setDraft((prev) => ({ ...prev, entryDate: nextDate }));
+  }
 
   return (
     <main className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-end gap-2">
-        <h1 className="text-2xl font-semibold text-ink">דף יומי</h1>
-        <span className="text-sm text-muted">{todayLabel}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-ink md:text-3xl">טאבולה ראסה - {selectedDateLabel}</h1>
+        <div className="flex items-center gap-2">
+          <button type="button" className="app-btn app-btn-secondary" onClick={() => moveDay(1)}>
+            היום הבא
+          </button>
+          <button type="button" className="app-btn app-btn-secondary" onClick={() => moveDay(-1)}>
+            היום הקודם
+          </button>
+          <button
+            type="button"
+            className="app-btn app-btn-secondary"
+            onClick={() => {
+              setSelectedDate(todayIso());
+              setActiveEntryId(null);
+              setDraft((prev) => ({ ...prev, entryDate: todayIso() }));
+            }}
+          >
+            היום
+          </button>
+        </div>
       </div>
 
       <section className="app-section space-y-3">
@@ -297,7 +334,7 @@ export function DailyWorkspace({
             className="app-btn app-btn-secondary"
             onClick={() => {
               setActiveEntryId(null);
-              setDraft(initialDraft());
+              setDraft(emptyDraftForDate(selectedDate));
               setText("");
             }}
             disabled={parsing || saving}
@@ -310,21 +347,8 @@ export function DailyWorkspace({
       {draft.rawText ? (
         <section className="app-section space-y-3 border-2 border-accent/25 bg-accent-soft/20">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">אישור לפני שמירה</h2>
+            <h2 className="text-base font-semibold">אישור לפני שמירת טיפול</h2>
             {draft.matchedPatientId ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">זוהה אוטומטית</span> : null}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {([DailyEntryType.SESSION, DailyEntryType.TASK, DailyEntryType.GUIDANCE] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setDraft((prev) => ({ ...prev, parsedType: type }))}
-                className={`rounded-full border px-3 py-1 text-xs ${draft.parsedType === type ? "border-accent bg-accent-soft text-accent" : "border-black/14 bg-white text-muted"}`}
-              >
-                {typeLabel(type)}
-              </button>
-            ))}
           </div>
 
           <div className="grid gap-2 md:grid-cols-2">
@@ -355,7 +379,7 @@ export function DailyWorkspace({
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted">כותרת</label>
-              <input type="text" className="app-field" value={draft.title} onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="כותרת (משימה/הדרכה)" />
+              <input type="text" className="app-field" value={draft.title} onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="כותרת קצרה לטיפול (אופציונלי)" />
             </div>
           </div>
 
@@ -376,21 +400,25 @@ export function DailyWorkspace({
         </section>
       ) : null}
 
-      <section className="app-section space-y-2">
-        <h2 className="text-sm font-semibold">טיוטות / נכשלו / נשמרו</h2>
-        {entries.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-black/14 p-3 text-sm text-muted">עדיין אין רשומות יומיות.</div>
+      <section
+        className="app-section space-y-2"
+        style={{ backgroundImage: "repeating-linear-gradient(to bottom, rgba(65,66,70,0.06) 0px, rgba(65,66,70,0.06) 1px, transparent 1px, transparent 40px)" }}
+      >
+        <h2 className="text-sm font-semibold">רשומות יומן ליום {formatDateDDMMYY(selectedDate)}</h2>
+        {entriesForSelectedDay.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-black/14 p-3 text-sm text-muted">אין עדיין רשומות ביום הזה.</div>
         ) : (
           <ul className="space-y-2">
-            {entries.map((entry) => (
+            {entriesForSelectedDay.map((entry) => (
               <li key={entry.id} className="rounded-xl border border-black/12 bg-white px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" className="text-sm font-medium text-accent hover:underline" onClick={() => openEntryForEdit(entry)}>
                     {entry.title || entry.content.slice(0, 60) || "רשומה יומית"}
                   </button>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] ${statusTone(entry.status)}`}>{statusLabel(entry.status)}</span>
-                  <span className="text-xs text-muted">{entry.entryDate}{entry.entryTime ? ` · ${entry.entryTime}` : ""}</span>
-                  <span className="text-xs text-muted">{typeLabel(entry.parsedType)}</span>
+                  <span className="text-xs text-muted">{formatDateDDMMYY(entry.entryDate)}{entry.entryTime ? ` · ${entry.entryTime}` : ""}</span>
+                  <span className="text-xs text-muted">נשמר ב־{formatSavedTime(entry.updatedAt)}</span>
+                  <span className="text-xs text-muted">טיפול</span>
                   {entry.targetEntityType && entry.targetEntityId ? (
                     <Link href={targetHref(entry.targetEntityType, entry.targetEntityId)} className="text-xs text-accent hover:underline">
                       פתח רשומה
@@ -412,11 +440,30 @@ export function DailyWorkspace({
   );
 }
 
-function typeLabel(type: DailyEntryType) {
-  if (type === DailyEntryType.SESSION) return "טיפול";
-  if (type === DailyEntryType.TASK) return "משימה";
-  if (type === DailyEntryType.GUIDANCE) return "הדרכה";
-  return "לא ידוע";
+function emptyDraftForDate(isoDate: string): DraftState {
+  return { ...initialDraft(), entryDate: isoDate };
+}
+
+function shiftIsoDate(isoDate: string, offsetDays: number) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDateDDMMYY(isoDate: string) {
+  const [year, month, day] = isoDate.split("-");
+  if (!year || !month || !day) return isoDate;
+  return `${day}-${month}-${year.slice(2)}`;
+}
+
+function formatDayDateLabel(isoDate: string) {
+  const weekday = new Date(`${isoDate}T00:00:00`).toLocaleDateString("he-IL", { weekday: "long" });
+  return `${weekday} ${formatDateDDMMYY(isoDate)}`;
+}
+
+function formatSavedTime(isoTimestamp: string) {
+  const date = new Date(isoTimestamp);
+  return date.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
 
 function statusLabel(status: DailyEntryStatus) {

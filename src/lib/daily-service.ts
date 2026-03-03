@@ -1,9 +1,28 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { DailyEntryStatus, DailyEntryType, DailyTargetEntityType, GuidanceStatus, PatientState, Prisma, SessionStatus, TaskStatus } from "@prisma/client";
+import { DailyEntryStatus, DailyEntryType, DailyTargetEntityType, PatientState, Prisma, SessionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DailyEntryViewModel, DailyParseResult } from "@/lib/daily-types";
 
 let anthropicClient: Anthropic | null | undefined;
+const MATCH_WINDOW_HOURS = 48;
+const DEFAULT_DAILY_TIME = "12:00";
+const TITLE_STOP_WORDS = new Set([
+  "של",
+  "על",
+  "עם",
+  "את",
+  "אני",
+  "היא",
+  "הוא",
+  "גם",
+  "כל",
+  "זה",
+  "מה",
+  "אם",
+  "לא",
+  "כן",
+  "אבל",
+]);
 
 function getAnthropicClient() {
   if (anthropicClient !== undefined) return anthropicClient;
@@ -23,7 +42,8 @@ function normalizeDate(raw: string | null | undefined) {
 
 function normalizeTime(raw: string | null | undefined) {
   const value = String(raw ?? "").trim();
-  return /^\d{2}:\d{2}$/.test(value) ? value : null;
+  const match = value.match(/^(\d{2}:\d{2})(?::\d{2})?$/);
+  return match ? match[1] : null;
 }
 
 function normalizeType(raw: unknown) {
@@ -38,6 +58,68 @@ function parseDateTime(entryDate: string, entryTime: string | null) {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+}
+
+function buildDailyTitle(rawTitle: string | null | undefined, content: string, rawText: string) {
+  const explicit = String(rawTitle ?? "").trim();
+  if (explicit) return explicit.slice(0, 32);
+
+  const source = `${content} ${rawText}`.trim();
+  const cleanedWords = source
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean);
+
+  const meaningful = cleanedWords.filter((w) => w.length > 1 && !TITLE_STOP_WORDS.has(w));
+  const pickFrom = meaningful.length > 0 ? meaningful : cleanedWords;
+  const words = pickFrom.slice(0, 4);
+  const title = words.join(" ").trim();
+  return (title || "רשומת טיפול").slice(0, 32);
+}
+
+function resolveEntryDateIso(entryDate: Date) {
+  return entryDate.toISOString().slice(0, 10);
+}
+
+function resolveScheduledAt(entryDate: Date, entryTime: string | null, fixedSessionTime: string | null) {
+  const dateIso = resolveEntryDateIso(entryDate);
+  const resolvedTime = normalizeTime(entryTime) ?? normalizeTime(fixedSessionTime) ?? DEFAULT_DAILY_TIME;
+  return parseDateTime(dateIso, resolvedTime);
+}
+
+function pickClosestSession<T extends { scheduledAt: Date }>(sessions: T[], target: Date) {
+  if (sessions.length === 0) return null;
+  const targetMs = target.getTime();
+  return [...sessions].sort((a, b) => {
+    const aDiff = Math.abs(a.scheduledAt.getTime() - targetMs);
+    const bDiff = Math.abs(b.scheduledAt.getTime() - targetMs);
+    if (aDiff !== bDiff) return aDiff - bDiff;
+    return a.scheduledAt.getTime() - b.scheduledAt.getTime();
+  })[0];
+}
+
+function formatDailyUpdateStamp(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jerusalem",
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("day")}-${part("month")}-${part("year")} ${part("hour")}:${part("minute")}`;
+}
+
+function appendSessionNote(current: string, nextContent: string) {
+  const next = nextContent.trim();
+  if (!next) return current;
+  const stamp = formatDailyUpdateStamp(new Date());
+  const base = current.trim();
+  if (!base) return next;
+  return `${base}\n\n---\nעדכון יומי ${stamp}\n${next}`;
 }
 
 function inferTypeByKeywords(text: string) {
@@ -205,14 +287,14 @@ export async function createDailyEntry(userId: string, payload: {
     data: {
       ownerUserId: userId,
       rawText: payload.rawText,
-      parsedType: payload.parsedType,
+      parsedType: DailyEntryType.SESSION,
       status: payload.status ?? DailyEntryStatus.READY,
       matchedPatientId: payload.matchedPatientId ?? null,
       matchedPatientName: payload.matchedPatientName ?? null,
       entryDate: new Date(`${payload.entryDate}T00:00:00`),
       entryTime: payload.entryTime ?? null,
       content: payload.content,
-      title: payload.title ?? null,
+      title: buildDailyTitle(payload.title, payload.content, payload.rawText),
       parserProvider: payload.parserProvider ?? null,
       parserConfidence: payload.parserConfidence ?? null,
       parseMetaJson: payload.parseMetaJson ?? undefined,
@@ -233,20 +315,26 @@ export async function updateDailyEntry(userId: string, entryId: string, payload:
 }) {
   const existing = await prisma.dailyEntry.findFirst({
     where: { id: entryId, ownerUserId: userId },
-    select: { id: true },
+    select: { id: true, title: true, rawText: true, content: true },
   });
   if (!existing) return null;
+
+  const nextRawText = payload.rawText !== undefined ? payload.rawText : existing.rawText;
+  const nextContent = payload.content !== undefined ? payload.content : existing.content;
+  const requestedTitle = payload.title === undefined ? existing.title : payload.title;
+  const shouldRecomputeTitle =
+    payload.title !== undefined || payload.content !== undefined || payload.rawText !== undefined;
 
   return prisma.dailyEntry.update({
     where: { id: entryId },
     data: {
-      ...(payload.parsedType ? { parsedType: payload.parsedType } : {}),
+      parsedType: DailyEntryType.SESSION,
       ...(payload.matchedPatientId !== undefined ? { matchedPatientId: payload.matchedPatientId } : {}),
       ...(payload.matchedPatientName !== undefined ? { matchedPatientName: payload.matchedPatientName } : {}),
       ...(payload.entryDate ? { entryDate: new Date(`${payload.entryDate}T00:00:00`) } : {}),
       ...(payload.entryTime !== undefined ? { entryTime: payload.entryTime } : {}),
       ...(payload.content !== undefined ? { content: payload.content } : {}),
-      ...(payload.title !== undefined ? { title: payload.title } : {}),
+      ...(shouldRecomputeTitle ? { title: buildDailyTitle(requestedTitle, nextContent, nextRawText) } : {}),
       ...(payload.status ? { status: payload.status } : {}),
       ...(payload.rawText !== undefined ? { rawText: payload.rawText } : {}),
     },
@@ -258,110 +346,96 @@ export async function commitDailyEntry(userId: string, entryId: string) {
     where: { id: entryId, ownerUserId: userId },
   });
   if (!entry) return { ok: false as const, status: 404, error: "רשומה יומית לא נמצאה." };
-
-  const parsedType = entry.parsedType;
-  const scheduledAt = parseDateTime(entry.entryDate.toISOString().slice(0, 10), entry.entryTime);
-  if (!scheduledAt) {
+  if (!entry.matchedPatientId) {
     await prisma.dailyEntry.update({ where: { id: entry.id }, data: { status: DailyEntryStatus.SAVE_FAILED } });
-    return { ok: false as const, status: 400, error: "תאריך/שעה לא תקינים." };
-  }
-
-  if ((parsedType === DailyEntryType.SESSION || parsedType === DailyEntryType.GUIDANCE) && !entry.matchedPatientId) {
-    await prisma.dailyEntry.update({ where: { id: entry.id }, data: { status: DailyEntryStatus.SAVE_FAILED } });
-    return { ok: false as const, status: 400, error: "בטיפול/הדרכה חובה לבחור מטופל." };
+    return { ok: false as const, status: 400, error: "בטיפול חובה לבחור מטופל." };
   }
 
   try {
-    if (parsedType === DailyEntryType.SESSION) {
-      const patient = await prisma.patient.findFirst({
-        where: { id: entry.matchedPatientId ?? "", ownerUserId: userId, archivedAt: null },
-        select: { id: true, defaultSessionFeeNis: true },
-      });
-      if (!patient) throw new Error("לא ניתן ליצור טיפול למטופל לא פעיל או לא קיים.");
+    const patient = await prisma.patient.findFirst({
+      where: { id: entry.matchedPatientId, ownerUserId: userId, archivedAt: null },
+      select: { id: true, defaultSessionFeeNis: true, fixedSessionTime: true },
+    });
+    if (!patient) throw new Error("לא ניתן ליצור טיפול למטופל לא פעיל או לא קיים.");
 
+    const resolvedScheduledAt = resolveScheduledAt(entry.entryDate, entry.entryTime, patient.fixedSessionTime);
+    if (!resolvedScheduledAt) {
+      await prisma.dailyEntry.update({ where: { id: entry.id }, data: { status: DailyEntryStatus.SAVE_FAILED } });
+      return { ok: false as const, status: 400, error: "תאריך/שעה לא תקינים." };
+    }
+
+    const windowStart = new Date(resolvedScheduledAt.getTime() - MATCH_WINDOW_HOURS * 60 * 60 * 1000);
+    const windowEnd = new Date(resolvedScheduledAt.getTime() + MATCH_WINDOW_HOURS * 60 * 60 * 1000);
+
+    const candidateSessions = await prisma.session.findMany({
+      where: {
+        patientId: patient.id,
+        status: { in: [SessionStatus.SCHEDULED, SessionStatus.COMPLETED] },
+        scheduledAt: { gte: windowStart, lte: windowEnd },
+      },
+      select: {
+        id: true,
+        scheduledAt: true,
+        sessionNote: { select: { markdown: true } },
+      },
+      orderBy: { scheduledAt: "asc" },
+    });
+
+    const closest = pickClosestSession(candidateSessions, resolvedScheduledAt);
+    const now = Date.now();
+    const incomingContent = entry.content.trim();
+
+    let targetSessionId = "";
+
+    if (closest) {
+      const nextStatus = closest.scheduledAt.getTime() <= now ? SessionStatus.COMPLETED : SessionStatus.SCHEDULED;
+      await prisma.session.update({
+        where: { id: closest.id },
+        data: { status: nextStatus },
+      });
+
+      if (incomingContent) {
+        if (closest.sessionNote) {
+          await prisma.sessionNote.update({
+            where: { sessionId: closest.id },
+            data: { markdown: appendSessionNote(closest.sessionNote.markdown, incomingContent) },
+          });
+        } else {
+          await prisma.sessionNote.create({
+            data: { sessionId: closest.id, markdown: incomingContent },
+          });
+        }
+      }
+      targetSessionId = closest.id;
+    } else {
+      const status = resolvedScheduledAt.getTime() <= now ? SessionStatus.COMPLETED : SessionStatus.SCHEDULED;
       const session = await prisma.session.create({
         data: {
           patientId: patient.id,
-          scheduledAt,
-          status: SessionStatus.COMPLETED,
+          scheduledAt: resolvedScheduledAt,
+          status,
           feeNis: patient.defaultSessionFeeNis ?? null,
           patientState: PatientState.NO_CHANGE,
-          sessionNote: entry.content
+          sessionNote: incomingContent
             ? {
-                create: { markdown: entry.content },
+                create: { markdown: incomingContent },
               }
             : undefined,
         },
       });
-
-      await prisma.dailyEntry.update({
-        where: { id: entry.id },
-        data: {
-          status: DailyEntryStatus.SAVED,
-          targetEntityType: DailyTargetEntityType.SESSION,
-          targetEntityId: session.id,
-        },
-      });
-      return { ok: true as const, targetEntityType: DailyTargetEntityType.SESSION, targetEntityId: session.id };
+      targetSessionId = session.id;
     }
 
-    if (parsedType === DailyEntryType.TASK || parsedType === DailyEntryType.UNKNOWN) {
-      if (parsedType === DailyEntryType.UNKNOWN) {
-        await prisma.dailyEntry.update({ where: { id: entry.id }, data: { status: DailyEntryStatus.SAVE_FAILED } });
-        return { ok: false as const, status: 400, error: "יש לבחור סוג רשומה לפני יצירה." };
-      }
-      const task = await prisma.task.create({
-        data: {
-          ownerUserId: userId,
-          title: (entry.title ?? "").trim() || entry.content.slice(0, 80) || "משימה חדשה",
-          dueAt: scheduledAt,
-          patientId: entry.matchedPatientId ?? null,
-          status: TaskStatus.OPEN,
-        },
-      });
-
-      await prisma.dailyEntry.update({
-        where: { id: entry.id },
-        data: {
-          status: DailyEntryStatus.SAVED,
-          targetEntityType: DailyTargetEntityType.TASK,
-          targetEntityId: task.id,
-        },
-      });
-      return { ok: true as const, targetEntityType: DailyTargetEntityType.TASK, targetEntityId: task.id };
-    }
-
-    if (parsedType === DailyEntryType.GUIDANCE) {
-      const patient = await prisma.patient.findFirst({
-        where: { id: entry.matchedPatientId ?? "", ownerUserId: userId, archivedAt: null },
-        select: { id: true },
-      });
-      if (!patient) throw new Error("לא ניתן ליצור הדרכה למטופל לא פעיל או לא קיים.");
-
-      const guidance = await prisma.guidance.create({
-        data: {
-          patientId: patient.id,
-          title: (entry.title ?? "").trim() || "הדרכה",
-          contentMarkdown: entry.content || "",
-          notesMarkdown: "",
-          status: GuidanceStatus.ACTIVE,
-          scheduledAt,
-        },
-      });
-
-      await prisma.dailyEntry.update({
-        where: { id: entry.id },
-        data: {
-          status: DailyEntryStatus.SAVED,
-          targetEntityType: DailyTargetEntityType.GUIDANCE,
-          targetEntityId: guidance.id,
-        },
-      });
-      return { ok: true as const, targetEntityType: DailyTargetEntityType.GUIDANCE, targetEntityId: guidance.id };
-    }
-
-    await prisma.dailyEntry.update({ where: { id: entry.id }, data: { status: DailyEntryStatus.SAVE_FAILED } });
-    return { ok: false as const, status: 400, error: "סוג רשומה לא נתמך." };
+    await prisma.dailyEntry.update({
+      where: { id: entry.id },
+      data: {
+        status: DailyEntryStatus.SAVED,
+        parsedType: DailyEntryType.SESSION,
+        targetEntityType: DailyTargetEntityType.SESSION,
+        targetEntityId: targetSessionId,
+      },
+    });
+    return { ok: true as const, targetEntityType: DailyTargetEntityType.SESSION, targetEntityId: targetSessionId };
   } catch (error) {
     await prisma.dailyEntry.update({ where: { id: entry.id }, data: { status: DailyEntryStatus.SAVE_FAILED } });
     const message = error instanceof Error ? error.message : "unknown";

@@ -5,13 +5,6 @@ import { getCurrentUser } from "@/lib/auth-server";
 import { canUseDailyV1 } from "@/lib/daily-feature";
 import { createDailyEntry, listDailyEntries } from "@/lib/daily-service";
 
-function normalizeType(raw: unknown) {
-  if (raw === DailyEntryType.SESSION) return DailyEntryType.SESSION;
-  if (raw === DailyEntryType.TASK) return DailyEntryType.TASK;
-  if (raw === DailyEntryType.GUIDANCE) return DailyEntryType.GUIDANCE;
-  return DailyEntryType.UNKNOWN;
-}
-
 function normalizeStatus(raw: unknown) {
   if (raw === DailyEntryStatus.DRAFT) return DailyEntryStatus.DRAFT;
   if (raw === DailyEntryStatus.READY) return DailyEntryStatus.READY;
@@ -61,7 +54,7 @@ export async function POST(req: Request) {
 
   const entry = await createDailyEntry(user.id, {
     rawText,
-    parsedType: normalizeType(body.parsedType),
+    parsedType: DailyEntryType.SESSION,
     status: normalizeStatus(body.status),
     matchedPatientId: String(body.matchedPatientId ?? "").trim() || null,
     matchedPatientName: String(body.matchedPatientName ?? "").trim() || null,

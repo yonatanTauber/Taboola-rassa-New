@@ -5,14 +5,6 @@ import { getCurrentUser } from "@/lib/auth-server";
 import { canUseDailyV1 } from "@/lib/daily-feature";
 import { updateDailyEntry } from "@/lib/daily-service";
 
-function normalizeType(raw: unknown) {
-  if (raw === DailyEntryType.SESSION) return DailyEntryType.SESSION;
-  if (raw === DailyEntryType.TASK) return DailyEntryType.TASK;
-  if (raw === DailyEntryType.GUIDANCE) return DailyEntryType.GUIDANCE;
-  if (raw === DailyEntryType.UNKNOWN) return DailyEntryType.UNKNOWN;
-  return undefined;
-}
-
 function normalizeStatus(raw: unknown) {
   if (raw === DailyEntryStatus.DRAFT) return DailyEntryStatus.DRAFT;
   if (raw === DailyEntryStatus.READY) return DailyEntryStatus.READY;
@@ -44,7 +36,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   };
 
   const updated = await updateDailyEntry(userId, id, {
-    parsedType: normalizeType(body.parsedType),
+    parsedType: DailyEntryType.SESSION,
     status: normalizeStatus(body.status),
     matchedPatientId: body.matchedPatientId === undefined ? undefined : (String(body.matchedPatientId ?? "").trim() || null),
     matchedPatientName: body.matchedPatientName === undefined ? undefined : (String(body.matchedPatientName ?? "").trim() || null),
