@@ -39,13 +39,17 @@ export async function POST(req: Request) {
 
     let filePath: string | null = null;
     if (file instanceof File && file.size > 0) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const filename = `${Date.now()}-${safeName}`;
-      const absDir = path.join(process.cwd(), "public", "uploads", "research");
-      await mkdir(absDir, { recursive: true });
-      const bytes = await file.arrayBuffer();
-      await writeFile(path.join(absDir, filename), Buffer.from(bytes));
-      filePath = `/uploads/research/${filename}`;
+      try {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filename = `${Date.now()}-${safeName}`;
+        const absDir = path.join(process.cwd(), "public", "uploads", "research");
+        await mkdir(absDir, { recursive: true });
+        const bytes = await file.arrayBuffer();
+        await writeFile(path.join(absDir, filename), Buffer.from(bytes));
+        filePath = `/uploads/research/${filename}`;
+      } catch (fsErr) {
+        console.warn("research file write skipped:", fsErr instanceof Error ? fsErr.message : fsErr);
+      }
     }
 
     let patientId: string | null = null;

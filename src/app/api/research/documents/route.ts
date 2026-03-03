@@ -46,16 +46,22 @@ export async function POST(req: Request) {
       if (ownedPatient) patientId = ownedPatient.id;
     }
 
-    // Handle file upload
+    // Handle file upload (best-effort — Vercel's serverless FS is read-only outside /tmp)
     let filePath: string | null = null;
     if (file instanceof File && file.size > 0) {
-      const bytes = await file.arrayBuffer();
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const filename = `${Date.now()}-${safeName}`;
-      const absDir = path.join(process.cwd(), "public", "uploads", "research");
-      await mkdir(absDir, { recursive: true });
-      await writeFile(path.join(absDir, filename), Buffer.from(bytes));
-      filePath = `/uploads/research/${filename}`;
+      try {
+        const bytes = await file.arrayBuffer();
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filename = `${Date.now()}-${safeName}`;
+        const absDir = path.join(process.cwd(), "public", "uploads", "research");
+        await mkdir(absDir, { recursive: true });
+        await writeFile(path.join(absDir, filename), Buffer.from(bytes));
+        filePath = `/uploads/research/${filename}`;
+      } catch (fsErr) {
+        // File storage unavailable in this environment (e.g. Vercel serverless).
+        // Metadata is still saved; the user retains their local copy of the file.
+        console.warn("research document file write skipped:", fsErr instanceof Error ? fsErr.message : fsErr);
+      }
     }
 
     const title =
