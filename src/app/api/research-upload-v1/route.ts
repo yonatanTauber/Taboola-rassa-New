@@ -6,10 +6,10 @@ import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 
 function parseCsv(raw: string) {
-  return raw
+  return Array.from(new Set(raw
     .split(",")
     .map((item) => item.trim())
-    .filter(Boolean);
+    .filter(Boolean)));
 }
 
 function normalizeKind(kindRaw: string) {
@@ -69,14 +69,14 @@ export async function POST(req: Request) {
       externalUrlRaw ||
       "מקור חדש";
 
-    const sourceRef = sourceRaw
-      ? {
-          connectOrCreate: {
-            where: { name: sourceRaw },
-            create: { name: sourceRaw },
-          },
-        }
-      : undefined;
+    const sourceRecord = sourceRaw
+      ? await prisma.researchSource.upsert({
+          where: { name: sourceRaw },
+          update: {},
+          create: { name: sourceRaw },
+          select: { id: true },
+        })
+      : null;
 
     const document = await prisma.researchDocument.create({
       data: {
@@ -84,49 +84,60 @@ export async function POST(req: Request) {
         kind,
         title,
         source: sourceRaw || null,
-        sourceRef,
+        sourceRef: sourceRecord ? { connect: { id: sourceRecord.id } } : undefined,
         externalUrl: externalUrlRaw || null,
         filePath,
         workspaceNotes: workspaceNotesRaw || null,
-        authors: authors.length
-          ? {
-              create: authors.map((name) => ({
-                author: {
-                  connectOrCreate: {
-                    where: { name },
-                    create: { name },
-                  },
-                },
-              })),
-            }
-          : undefined,
-        topics: topics.length
-          ? {
-              create: topics.map((name) => ({
-                topic: {
-                  connectOrCreate: {
-                    where: { name },
-                    create: { name },
-                  },
-                },
-              })),
-            }
-          : undefined,
-        links: patientId
-          ? {
-              create: {
-                targetEntityType: ResearchTargetType.PATIENT,
-                targetEntityId: patientId,
-              },
-            }
-          : undefined,
       },
       select: { id: true },
     });
 
+    if (authors.length) {
+      const authorIds: string[] = [];
+      for (const name of authors) {
+        const author = await prisma.author.upsert({
+          where: { name },
+          update: {},
+          create: { name },
+          select: { id: true },
+        });
+        authorIds.push(author.id);
+      }
+      await prisma.researchDocumentAuthor.createMany({
+        data: authorIds.map((authorId) => ({ documentId: document.id, authorId })),
+      });
+    }
+
+    if (topics.length) {
+      const topicIds: string[] = [];
+      for (const name of topics) {
+        const topic = await prisma.topic.upsert({
+          where: { name },
+          update: {},
+          create: { name },
+          select: { id: true },
+        });
+        topicIds.push(topic.id);
+      }
+      await prisma.researchDocumentTopic.createMany({
+        data: topicIds.map((topicId) => ({ documentId: document.id, topicId })),
+      });
+    }
+
+    if (patientId) {
+      await prisma.researchLink.create({
+        data: {
+          researchDocumentId: document.id,
+          targetEntityType: ResearchTargetType.PATIENT,
+          targetEntityId: patientId,
+        },
+      });
+    }
+
     return NextResponse.json({ ok: true, documentId: document.id });
   } catch (error) {
     console.error("research-upload-v1 failed", error);
-    return NextResponse.json({ error: "שמירת המסמך נכשלה." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "unknown";
+    return NextResponse.json({ error: `שמירת המסמך נכשלה. ${message}` }, { status: 500 });
   }
 }
