@@ -23,12 +23,15 @@ const SECONDARY_ITEMS = [
   { href: "/settings", label: "הגדרות" },
 ];
 
-export function TopNav({ canManageInvites = false }: { canManageInvites?: boolean }) {
+export function TopNav({ canManageInvites = false, canUseDaily = false }: { canManageInvites?: boolean; canUseDaily?: boolean }) {
   const pathname = usePathname();
-  const items = useMemo(() => {
-    if (!canManageInvites) return [...PRIMARY_ITEMS, ...SECONDARY_ITEMS];
-    return [...PRIMARY_ITEMS, ...SECONDARY_ITEMS.slice(0, -1), { href: "/invites", label: "הזמנות" }, SECONDARY_ITEMS[SECONDARY_ITEMS.length - 1]];
-  }, [canManageInvites]);
+  const { primaryItems, secondaryItems } = useMemo(() => {
+    const primaryItems = canUseDaily ? [{ href: "/daily", label: "יומי" }, ...PRIMARY_ITEMS] : [...PRIMARY_ITEMS];
+    const secondaryItems = canManageInvites
+      ? [...SECONDARY_ITEMS.slice(0, -1), { href: "/invites", label: "הזמנות" }, SECONDARY_ITEMS[SECONDARY_ITEMS.length - 1]]
+      : [...SECONDARY_ITEMS];
+    return { primaryItems, secondaryItems };
+  }, [canManageInvites, canUseDaily]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -43,7 +46,7 @@ export function TopNav({ canManageInvites = false }: { canManageInvites?: boolea
         </Link>
         <div className="flex flex-1 items-center gap-2">
           <GlobalSearch />
-          <QuickAddControl />
+          <QuickAddControl canUseDaily={canUseDaily} />
           <button
             type="button"
             onClick={handleLogout}
@@ -61,7 +64,7 @@ export function TopNav({ canManageInvites = false }: { canManageInvites?: boolea
         </Link>
 
         <nav className="hidden flex-1 flex-wrap items-center justify-center gap-3 lg:flex-nowrap md:flex">
-          {PRIMARY_ITEMS.map((item) => {
+          {primaryItems.map((item) => {
             const active =
               item.href === "/"
                 ? pathname === "/"
@@ -81,11 +84,11 @@ export function TopNav({ canManageInvites = false }: { canManageInvites?: boolea
             );
           })}
 
-          <QuickAddControl />
+          <QuickAddControl canUseDaily={canUseDaily} />
 
           <GlobalSearch />
 
-          {items.slice(PRIMARY_ITEMS.length).map((item) => {
+          {secondaryItems.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link

@@ -21,9 +21,20 @@ const SECONDARY_ITEMS = [
 
 type DockPanel = "more" | null;
 
-export function MobileBottomDock({ canManageInvites = false }: { canManageInvites?: boolean }) {
+export function MobileBottomDock({
+  canManageInvites = false,
+  canUseDaily = false,
+}: {
+  canManageInvites?: boolean;
+  canUseDaily?: boolean;
+}) {
   const pathname = usePathname();
   const [panel, setPanel] = useState<DockPanel>(null);
+
+  const primaryItems = useMemo(
+    () => (canUseDaily ? [{ href: "/daily", label: "יומי" }, ...PRIMARY_ITEMS] : [...PRIMARY_ITEMS]),
+    [canUseDaily],
+  );
 
   const allSecondaryItems = useMemo(() => {
     if (!canManageInvites) return SECONDARY_ITEMS;
@@ -63,8 +74,12 @@ export function MobileBottomDock({ canManageInvites = false }: { canManageInvite
 
       <div className="fixed inset-x-0 bottom-0 z-[97] md:hidden" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}>
         <div className="mx-auto w-full max-w-[720px] px-2 pb-2">
-          <nav className="grid grid-cols-5 gap-1 rounded-2xl border border-black/15 bg-white/96 p-1 shadow-lg backdrop-blur-sm" aria-label="ניווט מובייל">
-            {PRIMARY_ITEMS.map((item) => {
+          <nav
+            className="grid gap-1 rounded-2xl border border-black/15 bg-white/96 p-1 shadow-lg backdrop-blur-sm"
+            style={{ gridTemplateColumns: `repeat(${primaryItems.length + 1}, minmax(0, 1fr))` }}
+            aria-label="ניווט מובייל"
+          >
+            {primaryItems.map((item) => {
               const active =
                 item.href === "/"
                   ? pathname === "/"

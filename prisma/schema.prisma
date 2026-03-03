@@ -104,6 +104,26 @@ enum PatientLifecycleEventType {
   REACTIVATED
 }
 
+enum DailyEntryType {
+  SESSION
+  TASK
+  GUIDANCE
+  UNKNOWN
+}
+
+enum DailyEntryStatus {
+  DRAFT
+  READY
+  SAVED
+  SAVE_FAILED
+}
+
+enum DailyTargetEntityType {
+  SESSION
+  TASK
+  GUIDANCE
+}
+
 model User {
   id                String    @id @default(cuid())
   fullName          String
@@ -123,6 +143,7 @@ model User {
   createdInvites    InviteCode[] @relation("InviteCodeOwner")
   usedInvites       InviteCode[] @relation("InviteCodeUsedBy")
   lifecycleEvents   PatientLifecycleEvent[] @relation("PatientLifecycleActor")
+  dailyEntries      DailyEntry[]
 }
 
 model InviteCode {
@@ -177,6 +198,7 @@ model Patient {
   figures               PatientFigure[]
   guidances             Guidance[]
   lifecycleEvents       PatientLifecycleEvent[]
+  dailyEntries          DailyEntry[]
   ownerUser             User?             @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, archivedAt])
@@ -561,6 +583,33 @@ model GuidanceSession {
 
   @@id([guidanceId, sessionId])
   @@index([sessionId])
+}
+
+model DailyEntry {
+  id                 String              @id @default(cuid())
+  ownerUserId        String
+  rawText            String
+  parsedType         DailyEntryType      @default(UNKNOWN)
+  status             DailyEntryStatus    @default(DRAFT)
+  matchedPatientId   String?
+  matchedPatientName String?
+  entryDate          DateTime
+  entryTime          String?
+  content            String
+  title              String?
+  parserProvider     String?
+  parserConfidence   Float?
+  parseMetaJson      Json?
+  targetEntityType   DailyTargetEntityType?
+  targetEntityId     String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  ownerUser          User                @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  matchedPatient     Patient?            @relation(fields: [matchedPatientId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@index([ownerUserId, status])
+  @@index([matchedPatientId, createdAt(sort: Desc)])
 }
 
 model AuditLog {

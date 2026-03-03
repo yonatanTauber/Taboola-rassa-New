@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { QuickActionsProvider } from "@/components/QuickActions";
 import { isAdminEmail } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth-server";
+import { canUseDailyV1 } from "@/lib/daily-feature";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -43,12 +44,15 @@ export default async function RootLayout({
 }>) {
   const user = await getCurrentUser();
   const canManageInvites = isAdminEmail(user?.email);
+  const canUseDaily = canUseDailyV1(user?.email);
 
   return (
     <html lang="he" dir="rtl">
       <body className={`${heebo.variable} ${plexMono.variable} ${caveat.variable} antialiased`}>
         <QuickActionsProvider>
-          <AppShell canManageInvites={canManageInvites}>{children}</AppShell>
+          <AppShell canManageInvites={canManageInvites} canUseDaily={canUseDaily}>
+            {children}
+          </AppShell>
         </QuickActionsProvider>
       </body>
     </html>

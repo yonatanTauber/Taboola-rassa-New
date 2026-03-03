@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { useQuickActions } from "@/components/QuickActions";
 
-export function QuickAddControl() {
+export function QuickAddControl({ canUseDaily = false }: { canUseDaily?: boolean }) {
   const {
     openMenu,
     menuAnimatingOut,
@@ -83,10 +83,19 @@ export function QuickAddControl() {
                 >
                   מקור חדש
                 </Link>
+                {canUseDaily ? (
+                  <Link
+                    href="/daily"
+                    onClick={() => closeMenuWithAnimation()}
+                    className="app-btn app-btn-secondary w-full text-xs"
+                  >
+                    דף יומי
+                  </Link>
+                ) : null}
                 <Link
                   href="/receipts/new"
                   onClick={() => closeMenuWithAnimation()}
-                  className="app-btn app-btn-secondary col-span-2 w-full text-xs"
+                  className={`app-btn app-btn-secondary w-full text-xs ${canUseDaily ? "" : "col-span-2"}`}
                 >
                   קבלה
                 </Link>
@@ -101,7 +110,8 @@ export function QuickAddControl() {
             <BubbleMenuLink index={3} label="פנייה חדשה" visible={!menuAnimatingOut} href="/inquiries" onClick={closeMenuWithAnimation} />
             <BubbleMenuAction index={4} label="פתק חופשי" visible={!menuAnimatingOut} onClick={() => openAction("note")} />
             <BubbleMenuLink index={5} label="מקור חדש" visible={!menuAnimatingOut} href="/research?upload=1" onClick={closeMenuWithAnimation} />
-            <BubbleMenuLink index={6} label="קבלה" visible={!menuAnimatingOut} href="/receipts/new" onClick={closeMenuWithAnimation} />
+            {canUseDaily ? <BubbleMenuLink index={6} label="דף יומי" visible={!menuAnimatingOut} href="/daily" onClick={closeMenuWithAnimation} /> : null}
+            <BubbleMenuLink index={canUseDaily ? 7 : 6} label="קבלה" visible={!menuAnimatingOut} href="/receipts/new" onClick={closeMenuWithAnimation} />
           </div>
         </>
       ) : null}
