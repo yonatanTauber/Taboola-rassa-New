@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { EntityBadge } from "@/components/EntityBadge";
 import { EntityLink } from "@/components/EntityLink";
-import { ResearchUploadPanel } from "@/components/research/ResearchUploadPanel";
+import { ResearchUploadPanelV1 } from "@/components/research/ResearchUploadPanelV1";
 
 type Doc = {
   id: string;
@@ -26,18 +26,12 @@ type Option = { id: string; name: string };
 export function ResearchWorkspace({
   docs,
   patients,
-  authorsCatalog,
-  topicsCatalog,
-  sourcesCatalog,
   initialFilters,
   uploadForPatientId,
   autoOpenUpload,
 }: {
   docs: Doc[];
   patients: Option[];
-  authorsCatalog: Option[];
-  topicsCatalog: Option[];
-  sourcesCatalog: Option[];
   initialFilters: { q: string; kind: string; topic: string; author: string };
   uploadForPatientId?: string;
   autoOpenUpload?: boolean;
@@ -50,7 +44,7 @@ export function ResearchWorkspace({
   const [linkedOnly, setLinkedOnly] = useState(false);
   // Auto-open upload panel when arriving from a patient page
   const [openUpload, setOpenUpload] = useState(!!uploadForPatientId || !!autoOpenUpload);
-  const [saveUploadRef, setSaveUploadRef] = useState<null | (() => void)>(null);
+  const [saveUpload, setSaveUpload] = useState<(() => void) | null>(null);
 
   const topicOptions = useMemo(
     () => [...new Set(docs.flatMap((doc) => doc.topics).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")),
@@ -198,20 +192,18 @@ export function ResearchWorkspace({
       {openUpload ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/25 px-3 backdrop-blur-sm overscroll-contain" onClick={(e) => e.target === e.currentTarget && setOpenUpload(false)}>
           <div className="w-[min(94vw,980px)] rounded-2xl border border-black/16 bg-white p-4 shadow-2xl">
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-2 flex items-center">
               <h2 className="me-auto text-lg font-semibold">העלאת מקור חדש</h2>
-              <button className="app-btn app-btn-primary" onClick={() => saveUploadRef?.()}>שמור</button>
+              <button className="app-btn app-btn-primary me-2" onClick={() => saveUpload?.()}>
+                שמור
+              </button>
               <button className="app-btn app-btn-secondary" onClick={() => setOpenUpload(false)}>סגור</button>
             </div>
             <div className="max-h-[78vh] overflow-auto">
-              <ResearchUploadPanel
-                inModal
+              <ResearchUploadPanelV1
                 patients={patients}
-                authorsCatalog={authorsCatalog}
-                topicsCatalog={topicsCatalog}
-                sourcesCatalog={sourcesCatalog}
                 defaultPatientId={uploadForPatientId}
-                onSaveRef={(handler) => setSaveUploadRef(() => handler)}
+                onSaveRef={setSaveUpload}
               />
             </div>
           </div>

@@ -61,21 +61,6 @@ export default async function ResearchPage({
   });
 
   const patientMap = new Map(patients.map((p) => [p.id, p]));
-  const authorMap = new Map<string, { id: string; name: string }>();
-  const topicMap = new Map<string, { id: string; name: string }>();
-  const sourceMap = new Map<string, { id: string; name: string }>();
-
-  for (const doc of docs) {
-    for (const item of doc.authors) {
-      authorMap.set(item.author.id, { id: item.author.id, name: item.author.name });
-    }
-    for (const item of doc.topics) {
-      topicMap.set(item.topic.id, { id: item.topic.id, name: item.topic.name });
-    }
-    if (doc.sourceId && doc.sourceRef?.name) {
-      sourceMap.set(doc.sourceId, { id: doc.sourceId, name: doc.sourceRef.name });
-    }
-  }
 
   return (
     <ResearchWorkspace
@@ -100,9 +85,6 @@ export default async function ResearchPage({
           })),
       }))}
       patients={patients.map((p) => ({ id: p.id, name: formatPatientName(p.firstName, p.lastName) }))}
-      authorsCatalog={[...authorMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
-      topicsCatalog={[...topicMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
-      sourcesCatalog={[...sourceMap.values()].sort((a, b) => a.name.localeCompare(b.name, "he"))}
       initialFilters={initialFilters}
       uploadForPatientId={uploadForPatientId}
       autoOpenUpload={autoOpenUpload}
