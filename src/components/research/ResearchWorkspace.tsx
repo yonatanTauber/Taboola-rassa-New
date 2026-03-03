@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { EntityBadge } from "@/components/EntityBadge";
@@ -173,6 +174,21 @@ export function ResearchWorkspace({
               <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-muted">{kindLabel(doc.kind)}</span>
             </div>
             <p className="text-xs text-muted">מקור: {doc.source ?? "לא צוין"}</p>
+            {doc.filePath && isPdfPath(doc.filePath) ? (
+              <div className="mt-2 rounded-lg border border-black/10 p-2">
+                <a
+                  href={`/api/research/file/${doc.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-accent hover:underline"
+                >
+                  פתח PDF לקריאה ↗
+                </a>
+              </div>
+            ) : null}
+            {doc.kind === "VIDEO" && doc.externalUrl ? (
+              <VideoThumb externalUrl={doc.externalUrl} title={doc.title} />
+            ) : null}
             <p className="text-xs text-muted">כותבים: {doc.authors.length ? doc.authors.join(", ") : "לא צוינו"}</p>
             <p className="text-xs text-muted">נושאים: {doc.topics.length ? doc.topics.join(", ") : "ללא"}</p>
             {doc.linkedPatients.length > 0 ? (
@@ -242,4 +258,49 @@ function kindLabel(kind: string) {
   if (kind === "VIDEO") return "סרטון";
   if (kind === "LECTURE_NOTE") return "הרצאה";
   return "אחר";
+}
+
+function isPdfPath(pathOrUrl: string) {
+  return pathOrUrl.toLowerCase().includes(".pdf");
+}
+
+function extractYouTubeId(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("youtube.com")) {
+      return parsed.searchParams.get("v");
+    }
+    if (parsed.hostname.includes("youtu.be")) {
+      return parsed.pathname.replace("/", "");
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function VideoThumb({ externalUrl, title }: { externalUrl: string; title: string }) {
+  const videoId = extractYouTubeId(externalUrl);
+  if (!videoId) {
+    return (
+      <div className="mt-2 text-xs text-muted">
+        <a href={externalUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+          פתח סרטון ↗
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <a href={externalUrl} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-lg border border-black/10">
+      <Image
+        src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+        alt={title}
+        width={480}
+        height={270}
+        className="h-28 w-full object-cover"
+        loading="lazy"
+      />
+    </a>
+  );
 }

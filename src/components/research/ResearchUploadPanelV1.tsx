@@ -98,6 +98,7 @@ export function ResearchUploadPanelV1({
 
   return (
     <section className="space-y-3">
+      <p className="text-xs text-muted">הנתונים לא נשמרים אוטומטית. שמירה מתבצעת רק בלחיצה על &quot;שמור&quot;.</p>
       <div className="grid gap-2 md:grid-cols-3">
         <button
           type="button"

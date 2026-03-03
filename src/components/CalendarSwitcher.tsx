@@ -393,18 +393,17 @@ function DraggableSession({ session }: { session: CalendarSession }) {
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none h-full">
       <Link
         href={session.href}
-        className={`block h-full overflow-hidden rounded-md px-1 py-0.5 text-[10px] text-ink hover:brightness-[0.97] cursor-grab active:cursor-grabbing ${sessionKindClass(session)} ${session.isRecurringTemplate ? "border-2 border-accent" : ""}`}
+        className={`block h-full min-h-[56px] rounded-md px-1.5 py-1 text-[10px] text-ink hover:brightness-[0.97] cursor-grab active:cursor-grabbing ${sessionKindClass(session)} ${session.isRecurringTemplate ? "border-2 border-accent" : ""}`}
         draggable={false}
       >
-        <div className="flex items-start justify-between gap-1">
+        <div className="mb-0.5 flex items-start justify-between gap-1">
           <div className="font-mono tabular-nums leading-tight">{timeRangeLabel(new Date(session.startIso))}</div>
           {session.isRecurringTemplate && <span className="text-[7px]">🔄</span>}
         </div>
-        <div className={`mb-0.5 inline-flex rounded-full px-1 py-[1px] text-[9px] ${sessionStatusTone(session.statusLabel)}`}>
+        <div className={`mb-1 inline-flex rounded-full px-1 py-[1px] text-[9px] ${sessionStatusTone(session.statusLabel)}`}>
           {sessionStatusLabel(session.statusLabel)}
         </div>
-        <div className="truncate text-[10px] font-semibold leading-tight">{session.patient}</div>
-        {session.title && <div className="truncate text-[9px] text-muted leading-tight">{session.title}</div>}
+        <div className="line-clamp-2 text-[10px] font-semibold leading-tight">{session.patient}</div>
       </Link>
     </div>
   );
@@ -496,7 +495,7 @@ function WeekBoard({
             const isToday = sameDay(day, today);
 
             return (
-              <div key={dateKey} className="relative min-w-[96px] flex-1 border-s border-black/8 first:border-s-0">
+              <div key={dateKey} className="relative min-w-[120px] flex-1 border-s border-black/8 first:border-s-0">
                 {/* Day header */}
                 <div className={`sticky top-0 z-20 flex h-8 items-center justify-center gap-1 border-b border-black/8 px-1 text-center text-[10px] ${isToday ? "bg-accent-soft font-semibold text-accent" : "bg-white text-muted"}`}>
                   <span>{`יום ${HEB_DAYS_LONG[day.getDay()]}`}</span>
@@ -533,7 +532,7 @@ function WeekBoard({
                     if (startDate.getHours() < startHour || startDate.getHours() >= endHour) return null;
                     const minutesFromStart = (startDate.getHours() - startHour) * 60 + startDate.getMinutes();
                     const top = (minutesFromStart / 60) * HOUR_H;
-                    const height = Math.max(24, (50 / 60) * HOUR_H);
+                    const height = Math.max(56, (50 / 60) * HOUR_H);
                     return (
                       <div
                         key={s.id}
