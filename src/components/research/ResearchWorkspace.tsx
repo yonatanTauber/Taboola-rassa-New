@@ -6,7 +6,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { EntityBadge } from "@/components/EntityBadge";
 import { EntityLink } from "@/components/EntityLink";
-import { ResearchUploadPanelV1 } from "@/components/research/ResearchUploadPanelV1";
+import { ResearchUploadPanel } from "@/components/research/ResearchUploadPanel";
 
 type Doc = {
   id: string;
@@ -30,12 +30,18 @@ export function ResearchWorkspace({
   initialFilters,
   uploadForPatientId,
   autoOpenUpload,
+  authorsCatalog = [],
+  topicsCatalog = [],
+  sourcesCatalog = [],
 }: {
   docs: Doc[];
   patients: Option[];
   initialFilters: { q: string; kind: string; topic: string; author: string };
   uploadForPatientId?: string;
   autoOpenUpload?: boolean;
+  authorsCatalog?: Option[];
+  topicsCatalog?: Option[];
+  sourcesCatalog?: Option[];
 }) {
   const router = useRouter();
   const [q, setQ] = useState(initialFilters.q);
@@ -216,9 +222,13 @@ export function ResearchWorkspace({
               <button className="app-btn app-btn-secondary" onClick={() => setOpenUpload(false)}>סגור</button>
             </div>
             <div className="max-h-[78vh] overflow-auto">
-              <ResearchUploadPanelV1
+              <ResearchUploadPanel
                 patients={patients}
+                authorsCatalog={authorsCatalog}
+                topicsCatalog={topicsCatalog}
+                sourcesCatalog={sourcesCatalog}
                 defaultPatientId={uploadForPatientId}
+                inModal
                 onSaveRef={(handler) => setSaveUpload(() => handler)}
               />
             </div>

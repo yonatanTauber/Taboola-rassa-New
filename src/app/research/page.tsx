@@ -23,12 +23,17 @@ export default async function ResearchPage({
   const uploadForPatientId = typeof params.uploadFor === "string" ? params.uploadFor : undefined;
   const autoOpenUpload = params.upload === "1" || params.upload === "true";
 
-  const patients = await prisma.patient.findMany({
-    where: { ownerUserId: userId, archivedAt: null },
-    select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-    take: 400,
-  });
+  const [patients, authorsCatalog, topicsCatalog, sourcesCatalog] = await Promise.all([
+    prisma.patient.findMany({
+      where: { ownerUserId: userId, archivedAt: null },
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      take: 400,
+    }),
+    prisma.author.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.topic.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.researchSource.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
   const ownedPatientIds = patients.map((patient) => patient.id);
 
   const docsWhere =
@@ -88,6 +93,9 @@ export default async function ResearchPage({
       initialFilters={initialFilters}
       uploadForPatientId={uploadForPatientId}
       autoOpenUpload={autoOpenUpload}
+      authorsCatalog={authorsCatalog}
+      topicsCatalog={topicsCatalog}
+      sourcesCatalog={sourcesCatalog}
     />
   );
 }
