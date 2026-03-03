@@ -58,6 +58,8 @@ export function CalendarSwitcher({
   const [taskPopup, setTaskPopup] = useState<{ dateLabel: string; tasks: CalendarTask[] } | null>(null);
   const [sessions, setSessions] = useState(initialSessions);
   const [tasks, setTasks] = useState(initialTasks);
+  const [startHour, setStartHour] = useState(8);
+  const [endHour, setEndHour] = useState(20);
   const [dragging, setDragging] = useState<DragItem | null>(null);
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -281,9 +283,9 @@ export function CalendarSwitcher({
   return (
     <Wrapper className={wrapperClass}>
       {/* Header: title + nav arrows + mode switcher */}
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">יומן</h2>
-        <div className="flex items-center gap-1 mr-auto">
+        <div className="mr-auto flex items-center gap-1">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -313,9 +315,19 @@ export function CalendarSwitcher({
             </button>
           )}
         </div>
-        <div className="flex gap-1 rounded-xl border border-black/12 p-1 text-[11px]">
-          <ModeButton active={mode === "week"} onClick={() => setMode("week")} label="שבועית" />
-          <ModeButton active={mode === "month"} onClick={() => setMode("month")} label="חודשית" />
+        <div className="flex items-center gap-2">
+          {mode === "week" && (
+            <TimeRangeSelector
+              startHour={startHour}
+              endHour={endHour}
+              onStartChange={setStartHour}
+              onEndChange={setEndHour}
+            />
+          )}
+          <div className="flex gap-1 rounded-xl border border-black/12 p-1 text-[11px]">
+            <ModeButton active={mode === "week"} onClick={() => setMode("week")} label="שבועית" />
+            <ModeButton active={mode === "month"} onClick={() => setMode("month")} label="חודשית" />
+          </div>
         </div>
       </div>
 
@@ -327,6 +339,8 @@ export function CalendarSwitcher({
             tasks={visibleTasks}
             today={today}
             onOpenDayTasks={setTaskPopup}
+            startHour={startHour}
+            endHour={endHour}
           />
         )}
         {mode === "month" && (
@@ -438,17 +452,19 @@ function WeekBoard({
   tasks,
   today,
   onOpenDayTasks,
+  startHour,
+  endHour,
 }: {
   anchor: Date;
   sessions: CalendarSession[];
   tasks: CalendarTask[];
   today: Date;
   onOpenDayTasks: (payload: { dateLabel: string; tasks: CalendarTask[] }) => void;
+  startHour: number;
+  endHour: number;
 }) {
   const { openAction } = useQuickActions();
   const [slotPicker, setSlotPicker] = useState<{ date: Date; hour: number } | null>(null);
-  const [startHour, setStartHour] = useState(8);
-  const [endHour, setEndHour] = useState(20);
 
   // Compute hour range based on selected start/end hours
   const HOUR_RANGE = Array.from(
@@ -466,16 +482,6 @@ function WeekBoard({
 
   return (
     <>
-      {/* Time range selector */}
-      <div className="mb-3 flex items-center justify-end">
-        <TimeRangeSelector
-          startHour={startHour}
-          endHour={endHour}
-          onStartChange={setStartHour}
-          onEndChange={setEndHour}
-        />
-      </div>
-
       <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "56vh" }}>
         <div dir="rtl" className="flex min-w-[600px]">
           {/* Time axis (right side in RTL) */}
@@ -719,9 +725,9 @@ function TimeRangeSelector({
   };
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <label className="text-muted">שעות:</label>
-      <select value={startHour} onChange={handleStartChange} className="app-select px-2 py-1 text-sm">
+    <div className="flex items-center gap-1.5 text-xs">
+      <label className="text-muted">שעות</label>
+      <select value={startHour} onChange={handleStartChange} className="app-select h-8 px-2 py-1 text-xs">
         {Array.from({ length: 24 }, (_, i) => (
           <option key={i} value={i}>
             {String(i).padStart(2, "0")}:00
@@ -729,7 +735,7 @@ function TimeRangeSelector({
         ))}
       </select>
       <span className="text-muted">עד</span>
-      <select value={endHour} onChange={handleEndChange} className="app-select px-2 py-1 text-sm">
+      <select value={endHour} onChange={handleEndChange} className="app-select h-8 px-2 py-1 text-xs">
         {Array.from({ length: 24 }, (_, i) => (
           <option key={i} value={i}>
             {String(i).padStart(2, "0")}:00
