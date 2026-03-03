@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { CustomSelect } from "@/components/CustomSelect";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import {
   createContext,
@@ -316,14 +317,14 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     setIsDirty(false);
     setScheduleAction("");
     setOpenAction(null);
-    router.push("/");
+    router.push(`/sessions/${data.sessionId}`);
     showToast({
       message: "הפגישה הוזנה בהצלחה",
       durationMs: 4500,
       undoLabel: "↺",
       onUndo: async () => {
         await fetch(`/api/sessions/${data.sessionId}`, { method: "DELETE" });
-        router.refresh();
+        router.push("/");
       },
     });
   }
@@ -419,11 +420,14 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
         <form onSubmit={createSession} className="space-y-3 text-sm">
           <label className="block space-y-1">
             <span className="text-xs text-muted">מטופל</span>
-            <select
-              required
-              name="patientId" autoComplete="off" value={sessionForm.patientId}
-              onChange={(e) => {
-                const patientId = e.target.value;
+            <CustomSelect
+              value={sessionForm.patientId}
+              placeholder="בחר מטופל"
+              searchable
+              options={[
+                ...patients.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+              onChange={(patientId) => {
                 const selected = patients.find((p) => p.id === patientId);
                 setSessionForm((prev) => ({
                   ...prev,
@@ -441,15 +445,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
                 }
                 setIsDirty(true);
               }}
-              className="app-select"
-            >
-              <option value="">בחר מטופל</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
           </label>
 
           <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
@@ -537,17 +533,17 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
             </label>
             <label className="space-y-1">
               <span className="text-xs text-muted">מיקום</span>
-              <select
-                name="location" autoComplete="off" value={sessionForm.location}
-                onChange={(e) => {
-                  setSessionForm((prev) => ({ ...prev, location: e.target.value }));
+              <CustomSelect
+                value={sessionForm.location}
+                options={[
+                  { value: "קליניקה", label: "קליניקה" },
+                  { value: "אונליין", label: "אונליין" },
+                ]}
+                onChange={(v) => {
+                  setSessionForm((prev) => ({ ...prev, location: v }));
                   setIsDirty(true);
                 }}
-                className="app-select"
-              >
-                <option value="קליניקה">קליניקה</option>
-                <option value="אונליין">אונליין</option>
-              </select>
+              />
             </label>
           </div>
 
@@ -596,21 +592,19 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
 
           <label className="block space-y-1">
             <span className="text-xs text-muted">שיוך</span>
-            <select
-              name="taskPatientId" autoComplete="off" value={taskForm.patientId}
-              onChange={(e) => {
-                setTaskForm((prev) => ({ ...prev, patientId: e.target.value }));
+            <CustomSelect
+              value={taskForm.patientId}
+              placeholder="משימה כללית לקליניקה"
+              searchable
+              options={[
+                { value: "", label: "משימה כללית לקליניקה" },
+                ...patients.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+              onChange={(v) => {
+                setTaskForm((prev) => ({ ...prev, patientId: v }));
                 setIsDirty(true);
               }}
-              className="app-select"
-            >
-              <option value="">משימה כללית לקליניקה</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
           </label>
 
           <label className="block space-y-1">
@@ -672,44 +666,43 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-1">
               <span className="text-xs text-muted">קישור</span>
-              <select
-                name="noteRelatedType" autoComplete="off" value={noteForm.relatedEntityType}
-                onChange={(e) => {
+              <CustomSelect
+                value={noteForm.relatedEntityType}
+                placeholder="ללא קישור"
+                options={[
+                  { value: "", label: "ללא קישור" },
+                  { value: "PATIENT", label: "מטופל" },
+                  { value: "RESEARCH_DOCUMENT", label: "מאמר" },
+                  { value: "OTHER", label: "ישות אחרת" },
+                ]}
+                onChange={(v) => {
                   setNoteForm((prev) => ({
                     ...prev,
-                    relatedEntityType: e.target.value,
+                    relatedEntityType: v,
                     relatedEntityId: "",
                     patientId: "",
                   }));
                   setIsDirty(true);
                 }}
-                className="app-select"
-              >
-                <option value="">ללא קישור</option>
-                <option value="PATIENT">מטופל</option>
-                <option value="RESEARCH_DOCUMENT">מאמר</option>
-                <option value="OTHER">ישות אחרת</option>
-              </select>
+              />
             </label>
 
             {noteForm.relatedEntityType === "PATIENT" ? (
               <label className="space-y-1">
                 <span className="text-xs text-muted">בחר מטופל</span>
-                <select
-                  name="notePatientId" autoComplete="off" value={noteForm.patientId}
-                  onChange={(e) => {
-                    setNoteForm((prev) => ({ ...prev, patientId: e.target.value }));
+                <CustomSelect
+                  value={noteForm.patientId}
+                  placeholder="ללא מטופל"
+                  searchable
+                  options={[
+                    { value: "", label: "ללא מטופל" },
+                    ...patients.map((p) => ({ value: p.id, label: p.name })),
+                  ]}
+                  onChange={(v) => {
+                    setNoteForm((prev) => ({ ...prev, patientId: v }));
                     setIsDirty(true);
                   }}
-                  className="app-select"
-                >
-                  <option value="">ללא מטופל</option>
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
             ) : (
               <label className="space-y-1">

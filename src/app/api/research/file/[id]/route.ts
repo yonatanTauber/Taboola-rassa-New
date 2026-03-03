@@ -23,17 +23,24 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const { id } = await params;
   const ownedPatientIds = await listOwnedPatientIds(userId);
-  if (ownedPatientIds.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Allow access if owned by the user OR linked to one of the user's patients
   const doc = await prisma.researchDocument.findFirst({
     where: {
       id,
-      links: {
-        some: {
-          targetEntityType: ResearchTargetType.PATIENT,
-          targetEntityId: { in: ownedPatientIds },
-        },
-      },
+      OR: ownedPatientIds.length > 0
+        ? [
+            { ownerUserId: userId },
+            {
+              links: {
+                some: {
+                  targetEntityType: ResearchTargetType.PATIENT,
+                  targetEntityId: { in: ownedPatientIds },
+                },
+              },
+            },
+          ]
+        : [{ ownerUserId: userId }],
     },
     select: { filePath: true },
   });

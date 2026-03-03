@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { CustomSelect } from "@/components/CustomSelect";
 import { useQuickActions } from "@/components/QuickActions";
 
 type PatientOption = {
@@ -194,12 +195,18 @@ export function ResearchUploadPanel({
       <div className="space-y-2 text-sm">
         <label className="block space-y-1">
         <span className="text-xs font-medium text-muted">סוג מקור</span>
-        <select
-          aria-label="סוג מקור" name="entryType" autoComplete="off"
+        <CustomSelect
           value={entryType}
-          onChange={(e) => {
-            const next = e.target.value as "ARTICLE_FILE" | "ARTICLE_LINK" | "BOOK" | "JOURNAL" | "NEWS" | "VIDEO_LINK";
-            setEntryType(next);
+          options={[
+            { value: "ARTICLE_FILE", label: "מאמר (קובץ)" },
+            { value: "ARTICLE_LINK", label: "קישור למאמר (אינטרנט)" },
+            { value: "BOOK", label: "ספר" },
+            { value: "JOURNAL", label: "כתב עת" },
+            { value: "NEWS", label: "כתבה" },
+            { value: "VIDEO_LINK", label: "קישור לסרטון" },
+          ]}
+          onChange={(next) => {
+            setEntryType(next as typeof entryType);
             setFile(null);
             setExternalUrl("");
             if (next === "VIDEO_LINK") setKind("VIDEO");
@@ -208,15 +215,7 @@ export function ResearchUploadPanel({
             if (next === "JOURNAL") setKind("LECTURE_NOTE");
             if (next === "NEWS") setKind("OTHER");
           }}
-          className="app-select"
-        >
-          <option value="ARTICLE_FILE">מאמר (קובץ)</option>
-          <option value="ARTICLE_LINK">קישור למאמר (אינטרנט)</option>
-          <option value="BOOK">ספר</option>
-          <option value="JOURNAL">כתב עת</option>
-          <option value="NEWS">כתבה</option>
-          <option value="VIDEO_LINK">קישור לסרטון</option>
-        </select>
+        />
         </label>
 
         {entryType === "ARTICLE_FILE" ? (
@@ -289,13 +288,17 @@ export function ResearchUploadPanel({
         {loading ? <p className="text-xs text-muted">מנתח את הקובץ…</p> : null}
         {suggested ? <p className="text-xs text-accent">הצעה אוטומטית מולאה. נא לוודא ולאשר.</p> : null}
 
-        <select name="kind" autoComplete="off" value={kind} onChange={(e) => setKind(e.target.value)} className="app-select">
-          <option value="ARTICLE">מאמר</option>
-          <option value="BOOK">ספר</option>
-          <option value="VIDEO">וידאו</option>
-          <option value="LECTURE_NOTE">הרצאה / סיכום</option>
-          <option value="OTHER">אחר</option>
-        </select>
+        <CustomSelect
+          value={kind}
+          options={[
+            { value: "ARTICLE", label: "מאמר" },
+            { value: "BOOK", label: "ספר" },
+            { value: "VIDEO", label: "וידאו" },
+            { value: "LECTURE_NOTE", label: "הרצאה / סיכום" },
+            { value: "OTHER", label: "אחר" },
+          ]}
+          onChange={setKind}
+        />
 
         <input name="title" autoComplete="off" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="כותרת פריט… לדוגמה: טראומה מורכבת" className="app-field" />
 
@@ -455,14 +458,16 @@ export function ResearchUploadPanel({
           ) : null}
         </div>
 
-        <select name="patientId" autoComplete="off" value={patientId} onChange={(e) => setPatientId(e.target.value)} className="app-select">
-          <option value="">ללא קישור למטופל</option>
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {patient.name}
-            </option>
-          ))}
-        </select>
+        <CustomSelect
+          value={patientId}
+          placeholder="ללא קישור למטופל"
+          searchable={patients.length > 5}
+          options={[
+            { value: "", label: "ללא קישור למטופל" },
+            ...patients.map((p) => ({ value: p.id, label: p.name })),
+          ]}
+          onChange={setPatientId}
+        />
         {selectedPatientName ? <p className="text-xs text-muted">יקושר למטופל: {selectedPatientName}</p> : null}
 
         <textarea

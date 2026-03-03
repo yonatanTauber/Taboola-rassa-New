@@ -145,7 +145,8 @@ export default async function ResearchDocumentPage({ params }: { params: Promise
       ? `/api/research/file/${document.id}`
       : "";
   const viewerUrl = document.externalUrl || localFileUrl || document.filePath || "";
-  const ext = extensionFromPath(document.filePath || document.externalUrl || viewerUrl);
+  // Also check document title as fallback (title defaults to filename on upload)
+  const ext = extensionFromPath(document.filePath || document.externalUrl || viewerUrl || document.title);
   const isVideoFile = ["mp4", "webm", "ogg", "mov", "m4v"].includes(ext);
   const isPdf = ext === "pdf";
   const isText = ["txt", "md"].includes(ext);
@@ -184,6 +185,7 @@ export default async function ResearchDocumentPage({ params }: { params: Promise
           isPdf={isPdf}
           isText={isText}
           viewerUrl={viewerUrl}
+          externalUrl={document.externalUrl ?? ""}
           serializedAnnotations={serializedAnnotations}
           categories={categories}
         />
@@ -255,15 +257,16 @@ function DocumentLayout({
   isPdf,
   isText,
   viewerUrl,
+  externalUrl,
   serializedAnnotations,
   categories,
-}: LayoutProps & { isPdf: boolean; isText: boolean; viewerUrl: string }) {
+}: LayoutProps & { isPdf: boolean; isText: boolean; viewerUrl: string; externalUrl: string }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
       {/* Left column: viewer + free-form notes below */}
       <div className="space-y-4">
         <div className="app-section">
-          {isPdf ? (
+          {isPdf && viewerUrl ? (
             <div className="flex flex-col">
               <iframe
                 src={viewerUrl}
@@ -279,13 +282,35 @@ function DocumentLayout({
                 פתח PDF בחלון חדש ↗
               </a>
             </div>
+          ) : isPdf && !viewerUrl ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
+              <div className="mb-1 font-medium text-amber-800">PDF הועלה אך אינו זמין להצגה בשרת זה</div>
+              <div className="text-amber-700">
+                {externalUrl ? (
+                  <>
+                    ניתן לצפות בו דרך הקישור החיצוני:{" "}
+                    <a href={externalUrl} target="_blank" rel="noreferrer" className="underline hover:text-accent">
+                      {externalUrl}
+                    </a>
+                  </>
+                ) : (
+                  "הוסף קישור חיצוני לקובץ כדי לאפשר צפייה."
+                )}
+              </div>
+            </div>
           ) : isText ? (
             <pre className="h-[68vh] overflow-auto whitespace-pre-wrap rounded-lg border border-black/10 p-3 text-sm">
               {document.ocrText || "אין תוכן טקסט להצגה."}
             </pre>
+          ) : viewerUrl ? (
+            <div className="rounded-lg border border-black/10 p-3 text-sm text-muted">
+              <a href={viewerUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                פתח קישור ↗
+              </a>
+            </div>
           ) : (
             <div className="rounded-lg border border-black/10 p-3 text-sm text-muted">
-              סוג קובץ זה לא נתמך עדיין להצגה מלאה בתוך המערכת. מומלץ להעלות PDF/TXT.
+              אין תוכן להצגה. ניתן להוסיף קישור חיצוני או להעלות קובץ PDF.
             </div>
           )}
         </div>

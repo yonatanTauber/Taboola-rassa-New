@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CustomSelect } from "@/components/CustomSelect";
 import { TaskChecklist } from "@/components/TaskChecklist";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, useDraggable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -709,33 +710,33 @@ function TimeRangeSelector({
   onStartChange: (h: number) => void;
   onEndChange: (h: number) => void;
 }) {
-  const handleStartChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const v = parseInt(e.target.value);
-    if (v < endHour) onStartChange(v);
-  };
-  const handleEndChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const v = parseInt(e.target.value);
-    if (v > startHour) onEndChange(v);
-  };
+  const hourOptions = Array.from({ length: 24 }, (_, i) => ({
+    value: String(i),
+    label: `${String(i).padStart(2, "0")}:00`,
+  }));
 
   return (
     <div className="flex items-center gap-2 text-sm">
       <label className="text-muted">שעות:</label>
-      <select value={startHour} onChange={handleStartChange} className="app-select px-2 py-1 text-sm">
-        {Array.from({ length: 24 }, (_, i) => (
-          <option key={i} value={i}>
-            {String(i).padStart(2, "0")}:00
-          </option>
-        ))}
-      </select>
+      <CustomSelect
+        value={String(startHour)}
+        options={hourOptions}
+        onChange={(v) => {
+          const n = parseInt(v);
+          if (n < endHour) onStartChange(n);
+        }}
+        className="w-24"
+      />
       <span className="text-muted">עד</span>
-      <select value={endHour} onChange={handleEndChange} className="app-select px-2 py-1 text-sm">
-        {Array.from({ length: 24 }, (_, i) => (
-          <option key={i} value={i}>
-            {String(i).padStart(2, "0")}:00
-          </option>
-        ))}
-      </select>
+      <CustomSelect
+        value={String(endHour)}
+        options={hourOptions}
+        onChange={(v) => {
+          const n = parseInt(v);
+          if (n > startHour) onEndChange(n);
+        }}
+        className="w-24"
+      />
     </div>
   );
 }
