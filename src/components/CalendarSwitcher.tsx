@@ -11,7 +11,7 @@ import { useQuickActions } from "@/components/QuickActions";
 const HEB_DAYS_LONG = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 // Hourly grid constants (moved to state in WeekBoard for dynamic range)
-const HOUR_H = 50; // px per hour
+const HOUR_H = 44; // px per hour (slightly denser weekly board)
 
 export type CalendarSession = {
   id: string;
@@ -393,12 +393,15 @@ function DraggableSession({ session }: { session: CalendarSession }) {
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none h-full">
       <Link
         href={session.href}
-        className={`block h-full overflow-hidden rounded-md px-1 py-0.5 text-[9px] text-ink hover:brightness-[0.97] cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"} ${session.isRecurringTemplate ? "border-2 border-accent" : ""}`}
+        className={`block h-full overflow-hidden rounded-md px-1 py-0.5 text-[9px] text-ink hover:brightness-[0.97] cursor-grab active:cursor-grabbing ${sessionKindClass(session)} ${session.isRecurringTemplate ? "border-2 border-accent" : ""}`}
         draggable={false}
       >
         <div className="flex items-start justify-between gap-1">
           <div className="font-mono tabular-nums leading-tight">{timeRangeLabel(new Date(session.startIso))}</div>
           {session.isRecurringTemplate && <span className="text-[7px]">🔄</span>}
+        </div>
+        <div className={`mb-0.5 inline-flex rounded-full px-1 py-[1px] text-[8px] ${sessionStatusTone(session.statusLabel)}`}>
+          {sessionStatusLabel(session.statusLabel)}
         </div>
         {session.title && <div className="truncate text-[8px] text-muted leading-tight">{session.title}</div>}
         <div className="truncate leading-tight">{session.patient}</div>
@@ -416,10 +419,10 @@ function DraggableSessionCompact({ session }: { session: CalendarSession }) {
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
       <Link
         href={session.href}
-        className={`block truncate rounded px-1 py-0.5 text-[10px] text-ink cursor-grab active:cursor-grabbing ${session.kind === "guidance" ? "bg-blue-100" : "bg-accent-soft"}`}
+        className={`block truncate rounded px-1 py-0.5 text-[10px] text-ink cursor-grab active:cursor-grabbing ${sessionKindClass(session)}`}
         draggable={false}
       >
-        {timeRangeLabel(new Date(session.startIso))} · {session.title ? `${session.title} · ` : ""}{session.patient}
+        {timeRangeLabel(new Date(session.startIso))} · {sessionStatusLabel(session.statusLabel)} · {session.title ? `${session.title} · ` : ""}{session.patient}
       </Link>
     </div>
   );
@@ -455,7 +458,7 @@ function WeekBoard({
     const d = new Date(start);
     d.setDate(start.getDate() + idx);
     return d;
-  }).reverse(); // RTL: reverse to Saturday-Sunday ordering
+  });
 
   return (
     <>
@@ -469,14 +472,14 @@ function WeekBoard({
         />
       </div>
 
-      <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "62vh" }}>
-        <div dir="ltr" className="flex min-w-[600px]">
-          {/* Time axis */}
-          <div className="w-11 flex-shrink-0 border-e border-black/8 bg-white">
+      <div className="overflow-x-auto overflow-y-auto rounded-xl border border-black/12" style={{ maxHeight: "56vh" }}>
+        <div dir="rtl" className="flex min-w-[600px]">
+          {/* Time axis (right side in RTL) */}
+          <div className="w-11 flex-shrink-0 border-s border-black/8 bg-white">
             <div className="h-8 border-b border-black/8" />
             {HOUR_RANGE.map((h) => (
               <div key={h} style={{ height: HOUR_H }} className="relative border-t border-black/[0.06]">
-                <span className="absolute -top-[9px] end-1.5 select-none text-[9px] tabular-nums text-muted">
+                <span className="absolute -top-[9px] start-1.5 select-none text-[9px] tabular-nums text-muted">
                   {String(h).padStart(2, "0")}:00
                 </span>
               </div>
@@ -737,6 +740,32 @@ function timeRangeLabel(start: Date) {
   const end = new Date(start);
   end.setMinutes(end.getMinutes() + 50);
   return `${start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}-${end.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function sessionStatusLabel(raw: string) {
+  if (raw === "COMPLETED" || raw === "התקיימה") return "התקיימה";
+  if (raw === "CANCELED" || raw === "בוטלה") return "בוטלה";
+  if (raw === "CANCELED_LATE" || raw === "בוטלה מאוחר") return "בוטלה מאוחר";
+  if (raw === "UNDOCUMENTED" || raw === "לא תועד") return "לא תועד";
+  if (raw === "ACTIVE" || raw === "פעילה") return "פעילה";
+  return "נקבעה";
+}
+
+function sessionStatusTone(raw: string) {
+  const label = sessionStatusLabel(raw);
+  if (label === "התקיימה") return "bg-emerald-100 text-emerald-700";
+  if (label === "בוטלה" || label === "בוטלה מאוחר") return "bg-rose-100 text-rose-700";
+  if (label === "לא תועד") return "bg-amber-100 text-amber-700";
+  return "bg-sky-100 text-sky-700";
+}
+
+function sessionKindClass(session: CalendarSession) {
+  if (session.kind === "guidance") return "bg-blue-100";
+  const label = sessionStatusLabel(session.statusLabel);
+  if (label === "התקיימה") return "bg-emerald-50";
+  if (label === "בוטלה" || label === "בוטלה מאוחר") return "bg-rose-50";
+  if (label === "לא תועד") return "bg-amber-50";
+  return "bg-accent-soft";
 }
 
 function DayTasksModal({ dateLabel, tasks, onClose }: { dateLabel: string; tasks: CalendarTask[]; onClose: () => void }) {
