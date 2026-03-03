@@ -31,6 +31,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 }
 
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await requireCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const { id } = await params;
+    const canAccess = await isResearchDocumentOwnedByUser(userId, id);
+    if (!canAccess) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    await prisma.researchDocument.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (isPrismaNotFoundError(error)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const message = error instanceof Error ? error.message : "Failed to delete research document";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 function isPrismaNotFoundError(error: unknown) {
   return (
     typeof error === "object" &&

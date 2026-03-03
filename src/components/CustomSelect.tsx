@@ -13,6 +13,7 @@ type Props = {
   options: SelectOption[];
   placeholder?: string;
   searchable?: boolean;
+  allowCustom?: boolean;
   className?: string;
   disabled?: boolean;
   required?: boolean;
@@ -25,6 +26,7 @@ export function CustomSelect({
   options,
   placeholder = "בחר…",
   searchable = false,
+  allowCustom = false,
   className = "",
   disabled = false,
   required,
@@ -89,6 +91,20 @@ export function CustomSelect({
             </div>
           )}
           <div className="max-h-52 overflow-y-auto p-1">
+            {allowCustom && searchable && query.trim() &&
+              !options.some((o) => o.label.toLowerCase() === query.trim().toLowerCase()) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(query.trim());
+                  setOpen(false);
+                  setQuery("");
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-right text-sm text-accent transition hover:bg-accent-soft"
+              >
+                <span className="truncate">הוסף &quot;{query.trim()}&quot;</span>
+              </button>
+            ) : null}
             {filtered.map((opt) => (
               <button
                 key={opt.value}
@@ -104,7 +120,7 @@ export function CustomSelect({
                 {opt.value === value && <span className="ms-auto shrink-0 text-accent text-xs">✓</span>}
               </button>
             ))}
-            {!filtered.length && (
+            {!filtered.length && !allowCustom && (
               <div className="px-3 py-3 text-center text-xs text-muted">לא נמצאו אפשרויות</div>
             )}
           </div>

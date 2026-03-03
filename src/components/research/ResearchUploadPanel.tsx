@@ -39,9 +39,7 @@ export function ResearchUploadPanel({
   const [sourceId, setSourceId] = useState("");
   const [sourceCustom, setSourceCustom] = useState("");
   const [authors, setAuthors] = useState<string[]>([]);
-  const [authorInput, setAuthorInput] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
-  const [topicInput, setTopicInput] = useState("");
   const [patientId, setPatientId] = useState(defaultPatientId);
   const [kind, setKind] = useState("ARTICLE");
   const [externalUrl, setExternalUrl] = useState("");
@@ -61,8 +59,6 @@ export function ResearchUploadPanel({
     [patients, patientId],
   );
   const sourcesByName = useMemo(() => new Map(sourcesCatalog.map((item) => [item.name, item.id])), [sourcesCatalog]);
-  const authorsByName = useMemo(() => new Set(authorsCatalog.map((item) => item.name)), [authorsCatalog]);
-  const topicsByName = useMemo(() => new Set(topicsCatalog.map((item) => item.name)), [topicsCatalog]);
   const authorsLabel = entryType === "VIDEO_LINK" ? "מרצה/יוצר (מופרד בפסיקים)" : "כותבים (מופרד בפסיקים)";
   const sourceLabel =
     entryType === "VIDEO_LINK"
@@ -173,9 +169,7 @@ export function ResearchUploadPanel({
     setSourceId("");
     setSourceCustom("");
     setAuthors([]);
-    setAuthorInput("");
     setTopics([]);
-    setTopicInput("");
     setPatientId("");
     setKind("ARTICLE");
     setExternalUrl("");
@@ -352,36 +346,19 @@ export function ResearchUploadPanel({
 
         <div className="space-y-1">
           <span className="text-xs font-medium text-muted">{authorsLabel}</span>
-          <div className="grid grid-cols-[1fr_auto] gap-2">
-            <input
-              list="research-author-options"
-              autoComplete="off"
-              value={authorInput}
-              onChange={(e) => setAuthorInput(e.target.value)}
-              placeholder="הקלד/י שם כותב…"
-              className="app-field"
-            />
-            <button
-              type="button"
-              className="app-btn app-btn-secondary"
-              onClick={() => {
-                const candidate = authorInput.trim();
-                if (!candidate) return;
-                setAuthors((prev) => (prev.includes(candidate) ? prev : [...prev, candidate]));
-                setAuthorInput("");
-                showToast({
-                  message: authorsByName.has(candidate) ? "הכותב נוסף לרשימה." : "הכותב חדש ויישמר בעת שמירה.",
-                });
-              }}
-            >
-              הוסף כותב
-            </button>
-          </div>
-          <datalist id="research-author-options">
-            {authorsCatalog.map((item) => (
-              <option key={item.id} value={item.name} />
-            ))}
-          </datalist>
+          <CustomSelect
+            value=""
+            searchable
+            allowCustom
+            placeholder="בחר/י או הקלד/י שם כותב…"
+            options={authorsCatalog
+              .map((item) => ({ value: item.name, label: item.name }))
+              .filter((opt) => !authors.includes(opt.value))}
+            onChange={(name) => {
+              if (!name) return;
+              setAuthors((prev) => (prev.includes(name) ? prev : [...prev, name]));
+            }}
+          />
           {authors.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {authors.map((name) => (
@@ -406,36 +383,19 @@ export function ResearchUploadPanel({
 
         <div className="space-y-1">
           <span className="text-xs font-medium text-muted">נושאים</span>
-          <div className="grid grid-cols-[1fr_auto] gap-2">
-            <input
-              list="research-topic-options"
-              autoComplete="off"
-              value={topicInput}
-              onChange={(e) => setTopicInput(e.target.value)}
-              placeholder="בחר/י או הקלד/י נושא…"
-              className="app-field"
-            />
-            <button
-              type="button"
-              className="app-btn app-btn-secondary"
-              onClick={() => {
-                const candidate = topicInput.trim();
-                if (!candidate) return;
-                setTopics((prev) => (prev.includes(candidate) ? prev : [...prev, candidate]));
-                setTopicInput("");
-                showToast({
-                  message: topicsByName.has(candidate) ? "הנושא נוסף לרשימה." : "הנושא חדש ויישמר בעת שמירה.",
-                });
-              }}
-            >
-              הוסף נושא
-            </button>
-          </div>
-          <datalist id="research-topic-options">
-            {topicsCatalog.map((item) => (
-              <option key={item.id} value={item.name} />
-            ))}
-          </datalist>
+          <CustomSelect
+            value=""
+            searchable
+            allowCustom
+            placeholder="בחר/י או הקלד/י נושא…"
+            options={topicsCatalog
+              .map((item) => ({ value: item.name, label: item.name }))
+              .filter((opt) => !topics.includes(opt.value))}
+            onChange={(name) => {
+              if (!name) return;
+              setTopics((prev) => (prev.includes(name) ? prev : [...prev, name]));
+            }}
+          />
           {topics.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {topics.map((name) => (

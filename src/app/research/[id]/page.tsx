@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
@@ -140,11 +142,18 @@ export default async function ResearchDocumentPage({ params }: { params: Promise
     documents: otherDocuments.map((d) => ({ id: d.id, label: d.title })),
   };
 
-  const localFileUrl =
-    document.filePath && document.filePath.startsWith("/") && !document.filePath.startsWith("//")
-      ? `/api/research/file/${document.id}`
-      : "";
-  const viewerUrl = document.externalUrl || localFileUrl || document.filePath || "";
+  let localFileUrl = "";
+  if (
+    document.filePath &&
+    document.filePath.startsWith("/") &&
+    !document.filePath.startsWith("//") &&
+    !document.filePath.includes("..")
+  ) {
+    const rel = document.filePath.replace(/^\/+/, "");
+    const abs = path.join(process.cwd(), "public", rel);
+    if (existsSync(abs)) localFileUrl = `/api/research/file/${document.id}`;
+  }
+  const viewerUrl = document.externalUrl || localFileUrl || "";
   // Also check document title as fallback (title defaults to filename on upload)
   const ext = extensionFromPath(document.filePath || document.externalUrl || viewerUrl || document.title);
   const isVideoFile = ["mp4", "webm", "ogg", "mov", "m4v"].includes(ext);

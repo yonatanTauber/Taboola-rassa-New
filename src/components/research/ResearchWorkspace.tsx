@@ -8,6 +8,7 @@ import { EntityBadge } from "@/components/EntityBadge";
 import { EntityLink } from "@/components/EntityLink";
 import { ResearchUploadPanel } from "@/components/research/ResearchUploadPanel";
 import { CustomSelect } from "@/components/CustomSelect";
+import { useQuickActions } from "@/components/QuickActions";
 
 type Doc = {
   id: string;
@@ -45,6 +46,7 @@ export function ResearchWorkspace({
   sourcesCatalog?: Option[];
 }) {
   const router = useRouter();
+  const { showToast } = useQuickActions();
   const [q, setQ] = useState(initialFilters.q);
   const [kind, setKind] = useState(initialFilters.kind);
   const [topic, setTopic] = useState(initialFilters.topic);
@@ -53,6 +55,8 @@ export function ResearchWorkspace({
   // Auto-open upload panel when arriving from a patient page
   const [openUpload, setOpenUpload] = useState(!!uploadForPatientId || !!autoOpenUpload);
   const [saveUpload, setSaveUpload] = useState<(() => void) | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const topicOptions = useMemo(
     () => [...new Set(docs.flatMap((doc) => doc.topics).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")),
@@ -97,6 +101,24 @@ export function ResearchWorkspace({
       linked: docs.filter((doc) => doc.linkedPatients.length > 0).length,
     };
   }, [docs]);
+
+  async function handleDelete(id: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/research/documents/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        showToast({ message: "מחיקת המסמך נכשלה." });
+        return;
+      }
+      showToast({ message: "המסמך נמחק." });
+      router.refresh();
+    } catch {
+      showToast({ message: "מחיקת המסמך נכשלה." });
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
+    }
+  }
 
   function toggleKind(k: string) {
     setKind((prev) => (prev === k ? "ALL" : k));
@@ -189,6 +211,35 @@ export function ResearchWorkspace({
               <Link href={`/research/${doc.id}`} className="me-auto min-w-0 truncate font-semibold text-accent hover:underline">{doc.title}</Link>
               <EntityBadge type="research-document" compact />
               <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-muted">{kindLabel(doc.kind)}</span>
+              {confirmDeleteId === doc.id ? (
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted">מחק?</span>
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={() => handleDelete(doc.id)}
+                    className="rounded px-1.5 py-0.5 text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    {deleting ? "מוחק…" : "כן, מחק"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="rounded px-1.5 py-0.5 text-muted transition hover:bg-black/[0.04]"
+                  >
+                    ביטול
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(doc.id)}
+                  className="rounded px-1.5 py-0.5 text-xs text-muted transition hover:bg-rose-50 hover:text-rose-500"
+                  aria-label="מחק מסמך"
+                >
+                  🗑
+                </button>
+              )}
             </div>
             <p className="text-xs text-muted">מקור: {doc.source ?? "לא צוין"}</p>
             {doc.filePath && isPdfPath(doc.filePath) ? (
