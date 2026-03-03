@@ -28,33 +28,42 @@ export function PatientQuickJump({ patients }: { patients: Item[] }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between rounded-lg border border-black/16 bg-white px-3 py-2 text-right text-sm text-ink transition hover:bg-accent-soft"
+        className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-right text-sm transition ${open ? "border-accent bg-accent-soft text-accent" : "border-black/16 bg-white text-ink hover:bg-accent-soft/60"}`}
       >
         <span className="truncate">בחירת מטופל</span>
-        <span className="text-xs text-muted">{open ? "▴" : "▾"}</span>
+        <span className="text-xs">{open ? "▴" : "▾"}</span>
       </button>
       {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 max-h-56 overflow-auto rounded-xl border border-black/16 bg-white p-2 shadow-xl">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש מטופל"
-            className="app-field mb-2"
-          />
-          {filtered.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                router.push(`/patients/${p.id}`);
-              }}
-              className="block w-full rounded-lg px-3 py-2 text-right text-sm text-ink transition hover:bg-accent-soft"
-            >
-              {p.name}
-            </button>
-          ))}
-          {!filtered.length ? <div className="px-3 py-2 text-xs text-muted">לא נמצאו מטופלים.</div> : null}
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[300] rounded-xl border border-black/16 bg-white shadow-2xl ring-1 ring-black/5">
+          <div className="p-2 border-b border-black/8">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="חיפוש מטופל…"
+              className="app-field text-sm"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto p-1">
+            {filtered.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setQuery("");
+                  router.push(`/patients/${p.id}`);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-right text-sm text-ink transition hover:bg-accent-soft"
+              >
+                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-black/[0.05] text-[10px] font-semibold text-muted">
+                  {p.name.charAt(0)}
+                </span>
+                <span className="truncate">{p.name}</span>
+              </button>
+            ))}
+            {!filtered.length ? <div className="px-3 py-3 text-center text-xs text-muted">לא נמצאו מטופלים</div> : null}
+          </div>
         </div>
       ) : null}
     </div>

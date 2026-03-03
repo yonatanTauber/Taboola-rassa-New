@@ -181,13 +181,13 @@ export default async function Home() {
               <MiniStat label="משימות פתוחות" value={openTasksCount} href="/tasks" hoverLabel="מעבר למשימות פתוחות" />
               <MiniStat label="ביטולים מאוחרים" value={lateCanceledCount} href="/sessions" hoverLabel="מעבר לביטולים מאוחרים" />
             </div>
-            <Link href={insight.href} className="rounded-2xl border border-accent/20 bg-gradient-to-l from-accent-soft to-white px-4 py-3 text-sm text-accent transition hover:translate-y-[-1px]">
-              <div className="mb-1 flex items-center gap-2 font-medium">
-                <span className="inline-block size-2 rounded-full bg-accent" />
+            <Link href={insight.href} className="block rounded-2xl border border-accent/25 bg-gradient-to-br from-white via-accent-soft/60 to-accent-soft px-4 py-4 text-sm text-accent shadow-sm transition hover:shadow-md hover:border-accent/40">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-accent/70">
+                <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent/10 text-accent">✦</span>
                 תובנה יומית
               </div>
-              <div>{insight.text}</div>
-              <div className="mt-1 text-xs opacity-80">{insight.cta}</div>
+              <div className="font-medium text-ink">{insight.text}</div>
+              <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">{insight.cta} ←</div>
             </Link>
           </div>
         </div>
