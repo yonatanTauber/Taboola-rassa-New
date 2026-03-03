@@ -186,7 +186,7 @@ export function ResearchWorkspace({
                 </a>
               </div>
             ) : null}
-            {doc.kind === "VIDEO" && doc.externalUrl ? (
+            {doc.externalUrl ? (
               <VideoThumb externalUrl={doc.externalUrl} title={doc.title} />
             ) : null}
             <p className="text-xs text-muted">כותבים: {doc.authors.length ? doc.authors.join(", ") : "לא צוינו"}</p>
@@ -219,7 +219,7 @@ export function ResearchWorkspace({
               <ResearchUploadPanelV1
                 patients={patients}
                 defaultPatientId={uploadForPatientId}
-                onSaveRef={setSaveUpload}
+                onSaveRef={(handler) => setSaveUpload(() => handler)}
               />
             </div>
           </div>
