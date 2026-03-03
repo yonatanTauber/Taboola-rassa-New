@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type InquiryStatusValue = "NEW" | "DISCOVERY_CALL" | "WAITLIST" | "CONVERTED" | "CLOSED";
 
@@ -104,7 +105,7 @@ export function InquiryStatusField({
     <div>
       {convertedLocked || closedLocked ? (
         <div className="space-y-1">
-          <div className="app-select w-full text-right text-xs text-muted">{lockedLabel}</div>
+          <div className="rounded-lg border border-black/16 bg-white px-3 py-2 text-right text-sm text-muted w-full">{lockedLabel}</div>
           {convertedLocked && linkedPatientId ? (
             <Link href={`/patients/${linkedPatientId}`} className="text-xs text-accent hover:underline">
               פתח/י מטופל
@@ -125,22 +126,18 @@ export function InquiryStatusField({
           ) : null}
         </div>
       ) : (
-        <select
-          name="status"
+        <CustomSelect
           value={status}
-          onChange={(event) => {
-            const next = event.target.value as InquiryStatusValue;
-            void saveStatus(next);
-          }}
-          className="app-select"
+          onChange={(next) => { void saveStatus(next as InquiryStatusValue); }}
+          options={[
+            { value: "NEW", label: "חדשה" },
+            { value: "DISCOVERY_CALL", label: "שיחת היכרות" },
+            { value: "WAITLIST", label: "המתנה" },
+            { value: "CONVERTED", label: "הפכה למטופל" },
+            { value: "CLOSED", label: "נסגרה" },
+          ]}
           disabled={saving}
-        >
-          <option value="NEW">חדשה</option>
-          <option value="DISCOVERY_CALL">שיחת היכרות</option>
-          <option value="WAITLIST">המתנה</option>
-          <option value="CONVERTED">הפכה למטופל</option>
-          <option value="CLOSED">נסגרה</option>
-        </select>
+        />
       )}
 
       <div className="mt-1 min-h-4 text-[11px]">

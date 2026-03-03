@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type Option = { id: string; name: string };
 
@@ -157,16 +158,20 @@ export function ResearchUploadPanelV1({
         />
       </label>
 
-      <label className="block space-y-1">
+      <div className="space-y-1">
         <span className="text-xs font-medium text-muted">סוג</span>
-        <select value={kind} onChange={(e) => setKind(e.target.value)} className="app-select">
-          <option value="ARTICLE">מאמר</option>
-          <option value="BOOK">ספר</option>
-          <option value="VIDEO">וידאו</option>
-          <option value="LECTURE_NOTE">הרצאה / סיכום</option>
-          <option value="OTHER">אחר</option>
-        </select>
-      </label>
+        <CustomSelect
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: "ARTICLE", label: "מאמר" },
+            { value: "BOOK", label: "ספר" },
+            { value: "VIDEO", label: "וידאו" },
+            { value: "LECTURE_NOTE", label: "הרצאה / סיכום" },
+            { value: "OTHER", label: "אחר" },
+          ]}
+        />
+      </div>
 
       <label className="block space-y-1">
         <span className="text-xs font-medium text-muted">מקור</span>
@@ -198,17 +203,18 @@ export function ResearchUploadPanelV1({
         />
       </label>
 
-      <label className="block space-y-1">
+      <div className="space-y-1">
         <span className="text-xs font-medium text-muted">קישור למטופל (אופציונלי)</span>
-        <select value={patientId} onChange={(e) => setPatientId(e.target.value)} className="app-select">
-          <option value="">ללא קישור למטופל</option>
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {patient.name}
-            </option>
-          ))}
-        </select>
-      </label>
+        <CustomSelect
+          value={patientId}
+          onChange={setPatientId}
+          options={[
+            { value: "", label: "ללא קישור למטופל" },
+            ...patients.map((patient) => ({ value: patient.id, label: patient.name })),
+          ]}
+          searchable
+        />
+      </div>
 
       <label className="block space-y-1">
         <span className="text-xs font-medium text-muted">הערות</span>

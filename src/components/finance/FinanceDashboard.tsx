@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type ReceiptRow = {
   id: string;
@@ -170,15 +171,24 @@ export function FinanceDashboard({
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select className="app-select" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} aria-label="בחירת תקופה">
-            <option value="CURRENT">חודש נוכחי</option>
-            <option value="ALL">כל השנה</option>
-            {months.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <select className="app-select" value={patientFilter} onChange={(e) => setPatientFilter(e.target.value)} aria-label="בחירת מטופל">
-            <option value="ALL">כל המטופלים</option>
-            {patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <CustomSelect
+            value={monthFilter}
+            onChange={setMonthFilter}
+            options={[
+              { value: "CURRENT", label: "חודש נוכחי" },
+              { value: "ALL", label: "כל השנה" },
+              ...months.map((m) => ({ value: m, label: m })),
+            ]}
+          />
+          <CustomSelect
+            value={patientFilter}
+            onChange={setPatientFilter}
+            options={[
+              { value: "ALL", label: "כל המטופלים" },
+              ...patients.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            searchable
+          />
           <button
             type="button"
             className={`app-btn !px-3 !py-1.5 text-xs ${viewMode === "CLINIC" ? "app-btn-primary" : "app-btn-secondary"}`}

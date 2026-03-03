@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { AppLogo } from "@/components/AppLogo";
+import { CustomSelect } from "@/components/CustomSelect";
 
 const PROFESSION_OPTIONS = [
   "מטפל/ת באמנויות",
@@ -84,22 +85,15 @@ export default function RegisterPage() {
 
           <label className="block text-sm text-muted">
             מקצוע
-            <select
+            <CustomSelect
+              value={profession}
+              onChange={setProfession}
+              options={PROFESSION_OPTIONS.map((option) => ({ value: option, label: option }))}
+              placeholder="בחר/י מקצוע"
+              className="mt-1"
               name="profession"
               required
-              value={profession}
-              onChange={(e) => setProfession(e.target.value)}
-              className="app-select mt-1"
-            >
-              <option value="" disabled>
-                בחר/י מקצוע
-              </option>
-              {PROFESSION_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            />
           </label>
 
           <label className="block text-sm text-muted">

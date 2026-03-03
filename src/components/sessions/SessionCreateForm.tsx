@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import { formatPatientName } from "@/lib/patient-name";
+import { CustomSelect } from "@/components/CustomSelect";
 
 // Helper: calculate next occurrence of weekday (0=Sun, 6=Sat) in Israel timezone
 function getNextRecurringDate(fixedSessionDay: number, fixedSessionTime: string): { date: string; time: string; dayName: string } {
@@ -96,6 +97,7 @@ export function SessionCreateForm({
   const [patientId, setPatientId] = useState(initialPatientId);
   const [dateValue, setDateValue] = useState(initialDate);
   const [timeValue, setTimeValue] = useState(initialTime);
+  const [locationValue, setLocationValue] = useState("קליניקה");
   const [scheduleAction, setScheduleAction] = useState<"move_fixed" | "add_extra" | "use_fixed" | "">("");
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -172,13 +174,12 @@ export function SessionCreateForm({
 
       <label className="space-y-1">
         <div className="text-xs text-muted">מטופל</div>
-        <select
-          name="patientId"
+        <CustomSelect
           value={patientId}
-          onChange={(e) => {
-            setPatientId(e.target.value);
+          onChange={(nextId) => {
+            setPatientId(nextId);
             setScheduleAction("");
-            const nextPatient = patients.find((p) => p.id === e.target.value);
+            const nextPatient = patients.find((p) => p.id === nextId);
             if (
               nextPatient?.fixedSessionDay &&
               nextPatient.fixedSessionTime &&
@@ -188,15 +189,14 @@ export function SessionCreateForm({
               setShowScheduleDialog(true);
             }
           }}
-          className="app-select"
+          options={patients.map((patient) => ({
+            value: patient.id,
+            label: formatPatientName(patient.firstName, patient.lastName),
+          }))}
+          name="patientId"
           required
-        >
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {formatPatientName(patient.firstName, patient.lastName)}
-            </option>
-          ))}
-        </select>
+          searchable
+        />
       </label>
 
       {recurringSessionSuggestion ? (
@@ -271,10 +271,15 @@ export function SessionCreateForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">
           <div className="text-xs text-muted">מיקום</div>
-          <select name="location" defaultValue="קליניקה" className="app-select">
-            <option value="קליניקה">קליניקה</option>
-            <option value="אונליין">אונליין</option>
-          </select>
+          <CustomSelect
+            value={locationValue}
+            onChange={setLocationValue}
+            options={[
+              { value: "קליניקה", label: "קליניקה" },
+              { value: "אונליין", label: "אונליין" },
+            ]}
+            name="location"
+          />
         </label>
         <label className="space-y-1">
           <div className="text-xs text-muted">מחיר (₪)</div>

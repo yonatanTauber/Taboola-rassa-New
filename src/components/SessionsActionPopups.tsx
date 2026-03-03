@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type PatientOption = {
   id: string;
@@ -12,13 +13,15 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
   const router = useRouter();
   const [open, setOpen] = useState<"session" | "task" | null>(null);
   const [savedMessage, setSavedMessage] = useState("");
+  const [sessionPatientId, setSessionPatientId] = useState("");
+  const [taskPatientId, setTaskPatientId] = useState("");
 
   async function submitSession(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
     const payload = {
-      patientId: String(fd.get("patientId") ?? ""),
+      patientId: sessionPatientId,
       scheduledAt: String(fd.get("scheduledAt") ?? ""),
       feeNis: String(fd.get("feeNis") ?? ""),
       location: String(fd.get("location") ?? ""),
@@ -44,7 +47,7 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
     const payload = {
       title: String(fd.get("title") ?? ""),
       dueAt: String(fd.get("dueAt") ?? ""),
-      patientId: String(fd.get("patientId") ?? ""),
+      patientId: taskPatientId,
     };
 
     const res = await fetch("/api/tasks", {
@@ -87,14 +90,16 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
 
       <ActionModal open={open === "session"} onClose={() => setOpen(null)} title="פגישה חדש">
         <form onSubmit={submitSession} className="space-y-2 text-sm">
-          <select required name="patientId" className="app-select">
-            <option value="">בחר מטופל</option>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={sessionPatientId}
+            onChange={setSessionPatientId}
+            options={[
+              { value: "", label: "בחר מטופל" },
+              ...patients.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            placeholder="בחר מטופל"
+            searchable
+          />
           <input required type="datetime-local" name="scheduledAt" className="app-field" />
           <input type="number" min="0" name="feeNis" placeholder="מחיר (₪)" className="app-field" />
           <input name="location" placeholder="מיקום (קליניקה / אונליין)" className="app-field" />
@@ -108,14 +113,16 @@ export function SessionsActionPopups({ patients }: { patients: PatientOption[] }
         <form onSubmit={submitTask} className="space-y-2 text-sm">
           <input required name="title" placeholder="תיאור משימה" className="app-field" />
           <input type="date" name="dueAt" className="app-field" />
-          <select name="patientId" className="app-select">
-            <option value="">משימה כללית לקליניקה</option>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={taskPatientId}
+            onChange={setTaskPatientId}
+            options={[
+              { value: "", label: "משימה כללית לקליניקה" },
+              ...patients.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            placeholder="משימה כללית לקליניקה"
+            searchable
+          />
           <button className="app-btn app-btn-primary w-full !py-2">
             שמירת משימה
           </button>

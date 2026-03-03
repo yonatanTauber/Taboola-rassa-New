@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type InstructorOption = {
   id: string;
@@ -342,19 +343,19 @@ export function GuidanceEditor({
           <div className="grid gap-2 md:grid-cols-4">
             <label className="space-y-1">
               <span className="text-xs text-muted">סטטוס</span>
-              <select
-                className="app-select"
+              <CustomSelect
                 value={status}
-                onChange={(e) => {
-                  const next = e.target.value as "ACTIVE" | "COMPLETED";
+                onChange={(v) => {
+                  const next = v as "ACTIVE" | "COMPLETED";
                   setStatus(next);
                   if (next === "ACTIVE") setCompletedAt("");
                   if (next === "COMPLETED" && !completedAt) setCompletedAt(toDateTimeInput(new Date()));
                 }}
-              >
-                <option value="ACTIVE">פעילה</option>
-                <option value="COMPLETED">הושלמה</option>
-              </select>
+                options={[
+                  { value: "ACTIVE", label: "פעילה" },
+                  { value: "COMPLETED", label: "הושלמה" },
+                ]}
+              />
             </label>
 
             <label className="space-y-1">
@@ -370,14 +371,16 @@ export function GuidanceEditor({
 
             <label className="space-y-1">
               <span className="text-xs text-muted">מדריך</span>
-              <select className="app-select" value={instructorId} onChange={(e) => setInstructorId(e.target.value)}>
-                <option value="">ללא מדריך</option>
-                {instructorOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.fullName}
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={instructorId}
+                onChange={setInstructorId}
+                options={[
+                  { value: "", label: "ללא מדריך" },
+                  ...instructorOptions.map((item) => ({ value: item.id, label: item.fullName })),
+                ]}
+                placeholder="ללא מדריך"
+                searchable
+              />
             </label>
 
             <label className="space-y-1">
@@ -517,20 +520,20 @@ export function GuidanceEditor({
           <div className="text-xs text-muted">נמצאו {recentCompletedCount} פגישות שהתקיימו בחודש האחרון.</div>
 
           <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-            <select
-              className="app-select"
+            <CustomSelect
               value={sessionToAddId}
-              onChange={(e) => setSessionToAddId(e.target.value)}
-            >
-              <option value="">בחר פגישה לקישור</option>
-              {sessions
-                .filter((session) => !selectedSessionsSet.has(session.id))
-                .map((session) => (
-                  <option key={session.id} value={session.id}>
-                    {new Date(session.scheduledAt).toLocaleString("he-IL")} · {sessionLabel(session.status)}
-                  </option>
-                ))}
-            </select>
+              onChange={setSessionToAddId}
+              options={[
+                { value: "", label: "בחר פגישה לקישור" },
+                ...sessions
+                  .filter((session) => !selectedSessionsSet.has(session.id))
+                  .map((session) => ({
+                    value: session.id,
+                    label: `${new Date(session.scheduledAt).toLocaleString("he-IL")} · ${sessionLabel(session.status)}`,
+                  })),
+              ]}
+              placeholder="בחר פגישה לקישור"
+            />
             <button
               type="button"
               className="app-btn app-btn-secondary"

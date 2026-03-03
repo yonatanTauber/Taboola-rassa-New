@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 const FIGURE_ROLE_LABELS: Record<string, string> = {
   MOTHER: "אמא",
@@ -140,15 +141,11 @@ export function FigurePageClient({
 
           <label className="block space-y-1">
             <span className="text-sm font-medium text-muted">קשר</span>
-            <select
+            <CustomSelect
               value={role}
-              onChange={(e) => { setRole(e.target.value); markDirty(); }}
-              className="app-select"
-            >
-              {Object.entries(FIGURE_ROLE_LABELS).map(([val, lbl]) => (
-                <option key={val} value={val}>{lbl}</option>
-              ))}
-            </select>
+              onChange={(v) => { setRole(v); markDirty(); }}
+              options={Object.entries(FIGURE_ROLE_LABELS).map(([val, lbl]) => ({ value: val, label: lbl }))}
+            />
           </label>
         </div>
 

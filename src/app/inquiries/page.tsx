@@ -2,6 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { InquiryStatusField } from "@/components/inquiries/InquiryStatusField";
+import { InquiryCreateForm } from "@/components/inquiries/InquiryCreateForm";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { convertInquiryToPatientById } from "@/lib/inquiries";
 import { prisma } from "@/lib/prisma";
@@ -82,24 +83,7 @@ export default async function InquiriesPage() {
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1.9fr]">
         <section className="rounded-2xl border border-black/10 bg-white p-4">
           <h1 className="mb-3 text-xl font-semibold">פנייה חדשה לטיפול</h1>
-          <form action={createInquiry} className="space-y-2">
-            <div className="grid gap-2 md:grid-cols-2">
-              <input name="firstName" required placeholder="שם פרטי *" className="app-field" />
-              <input name="lastName" required placeholder="שם משפחה *" className="app-field" />
-              <input name="phone" required placeholder="טלפון *" className="app-field" />
-              <select name="gender" className="app-select">
-                <option value="">מגדר (אופציונלי)</option>
-                <option value="MALE">גבר</option>
-                <option value="FEMALE">אישה</option>
-                <option value="OTHER">אחר</option>
-              </select>
-              <input name="referralSource" placeholder="מקור פנייה" className="app-field" />
-            </div>
-            <textarea name="notes" placeholder="הערות על הפנייה" className="app-textarea min-h-24" />
-            <div className="flex justify-end">
-              <button className="app-btn app-btn-primary">שמור</button>
-            </div>
-          </form>
+          <InquiryCreateForm action={createInquiry} />
         </section>
 
         <section className="rounded-2xl border border-black/10 bg-white p-4">

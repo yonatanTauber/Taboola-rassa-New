@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type SessionPayload = {
   id: string;
@@ -245,30 +246,31 @@ export function SessionEditor({ session }: { session: SessionPayload }) {
             </select>
           </div>
         </div>
-        <select
+        <CustomSelect
           value={form.status}
-          onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
-          className="app-select"
+          onChange={(v) => setForm((p) => ({ ...p, status: v }))}
+          options={[
+            { value: "SCHEDULED", label: "נקבעה" },
+            { value: "COMPLETED", label: "התקיימה" },
+            { value: "CANCELED", label: "בוטלה" },
+            { value: "CANCELED_LATE", label: "בוטלה מאוחר" },
+            { value: "UNDOCUMENTED", label: "לא תועד" },
+          ]}
           disabled={isReadOnly}
-        >
-          <option value="SCHEDULED">נקבעה</option>
-          <option value="COMPLETED">התקיימה</option>
-          <option value="CANCELED">בוטלה</option>
-          <option value="CANCELED_LATE">בוטלה מאוחר</option>
-          <option value="UNDOCUMENTED">לא תועד</option>
-        </select>
+        />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <select
+        <CustomSelect
           value={form.location}
-          onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-          className="app-select"
+          onChange={(v) => setForm((p) => ({ ...p, location: v }))}
+          options={[
+            { value: "קליניקה", label: "קליניקה" },
+            { value: "אונליין", label: "אונליין" },
+            { value: "", label: "אחר" },
+          ]}
+          placeholder="אחר"
           disabled={isReadOnly}
-        >
-          <option value="קליניקה">קליניקה</option>
-          <option value="אונליין">אונליין</option>
-          <option value="">אחר</option>
-        </select>
+        />
         <input
           value={form.feeNis}
           onChange={(e) => setForm((p) => ({ ...p, feeNis: e.target.value }))}

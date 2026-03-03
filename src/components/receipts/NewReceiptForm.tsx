@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type Patient = { id: string; name: string };
 type UnpaidSession = {
@@ -86,18 +87,16 @@ export function NewReceiptForm({ patients, initialPatientId }: { patients: Patie
 
       <label className="block space-y-1 text-sm">
         <span className="text-xs text-muted">מטופל</span>
-        <select
+        <CustomSelect
           value={patientId}
-          onChange={(e) => loadPatientSessions(e.target.value)}
-          className="app-select"
-        >
-          <option value="">בחר מטופל</option>
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {patient.name}
-            </option>
-          ))}
-        </select>
+          onChange={loadPatientSessions}
+          options={[
+            { value: "", label: "בחר מטופל" },
+            ...patients.map((patient) => ({ value: patient.id, label: patient.name })),
+          ]}
+          placeholder="בחר מטופל"
+          searchable
+        />
       </label>
 
       <section className="rounded-xl border border-black/10 p-3">

@@ -1,13 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { requireCurrentUserId } from "@/lib/auth-server";
-import { formatPatientName } from "@/lib/patient-name";
 import { prisma } from "@/lib/prisma";
-
-function toDateInput(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
+import { NewTaskForm } from "@/components/tasks/NewTaskForm";
 
 async function createTask(formData: FormData) {
   "use server";
@@ -81,39 +76,12 @@ export default async function NewTaskPage({
       <section className="app-section border-black/18">
         <h1 className="mb-3 text-xl font-semibold">הוספת משימה</h1>
         {error ? <div className="mb-3 rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</div> : null}
-        <form action={createTask} className="space-y-3">
-          <label className="space-y-1">
-            <div className="text-xs text-muted">שיוך למטופל (אופציונלי)</div>
-            <select name="patientId" defaultValue={selected?.id ?? ""} className="app-select">
-              <option value="">משימה כללית לקליניקה</option>
-              {patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {formatPatientName(patient.firstName, patient.lastName)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="space-y-1">
-            <div className="text-xs text-muted">משימה</div>
-            <input name="title" required className="app-field" placeholder="מה צריך לבצע?" />
-          </label>
-
-          <label className="space-y-1">
-            <div className="text-xs text-muted">תאריך לביצוע</div>
-            <input name="dueAt" type="date" defaultValue={toDateInput(new Date())} className="app-field" />
-          </label>
-
-          <label className="inline-flex items-center gap-2 text-sm text-ink">
-            <input name="withReminder" type="checkbox" className="accent-accent" />
-            תזכורת במערכת
-          </label>
-
-          <div className="flex justify-end gap-2">
-            <Link href={selected ? `/patients/${selected.id}` : "/tasks"} className="app-btn app-btn-secondary">ביטול</Link>
-            <button type="submit" className="app-btn app-btn-primary">אישור</button>
-          </div>
-        </form>
+        <NewTaskForm
+          patients={patients}
+          initialPatientId={selected?.id ?? ""}
+          selectedId={selected?.id ?? null}
+          action={createTask}
+        />
       </section>
     </main>
   );

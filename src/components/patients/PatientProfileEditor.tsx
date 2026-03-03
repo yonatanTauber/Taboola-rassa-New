@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuickActions } from "@/components/QuickActions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PatientStatusDialog } from "@/components/patients/PatientStatusDialog";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type FormState = {
   firstName: string;
@@ -202,17 +203,16 @@ export function PatientProfileEditor({
           />
         </LabeledField>
         <LabeledField label="מגדר">
-          <select
+          <CustomSelect
             disabled={!editing}
             value={form.gender}
-            onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value as FormState["gender"] }))}
-            className="app-select disabled:bg-black/[0.03]"
-          >
-            <option value="" disabled className="text-muted">מגדר</option>
-            <option value="MALE">גבר</option>
-            <option value="FEMALE">אישה</option>
-            <option value="OTHER">אחר</option>
-          </select>
+            onChange={(v) => setForm((prev) => ({ ...prev, gender: v as FormState["gender"] }))}
+            options={[
+              { value: "MALE", label: "גבר" },
+              { value: "FEMALE", label: "אישה" },
+              { value: "OTHER", label: "אחר" },
+            ]}
+          />
         </LabeledField>
         <LabeledField label="תאריך לידה">
           <input
@@ -225,21 +225,22 @@ export function PatientProfileEditor({
           />
         </LabeledField>
         <LabeledField label="יום פגישה קבוע">
-          <select
+          <CustomSelect
             disabled={!editing}
             value={form.fixedSessionDay}
-            onChange={(e) => setForm((prev) => ({ ...prev, fixedSessionDay: e.target.value }))}
-            className="app-select disabled:bg-black/[0.03]"
-          >
-            <option value="">לא הוגדר</option>
-            <option value="1">יום ראשון</option>
-            <option value="2">יום שני</option>
-            <option value="3">יום שלישי</option>
-            <option value="4">יום רביעי</option>
-            <option value="5">יום חמישי</option>
-            <option value="6">יום שישי</option>
-            <option value="0">שבת</option>
-          </select>
+            onChange={(v) => setForm((prev) => ({ ...prev, fixedSessionDay: v }))}
+            options={[
+              { value: "", label: "לא הוגדר" },
+              { value: "1", label: "יום ראשון" },
+              { value: "2", label: "יום שני" },
+              { value: "3", label: "יום שלישי" },
+              { value: "4", label: "יום רביעי" },
+              { value: "5", label: "יום חמישי" },
+              { value: "6", label: "יום שישי" },
+              { value: "0", label: "שבת" },
+            ]}
+            placeholder="לא הוגדר"
+          />
         </LabeledField>
         <LabeledField label="שעת פגישה קבועה">
           <input

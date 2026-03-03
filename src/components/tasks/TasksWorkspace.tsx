@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type TaskRow = {
   id: string;
@@ -137,20 +138,27 @@ export function TasksWorkspace({
       {/* Filters */}
       <section className="app-section">
         <div className="grid gap-3 lg:grid-cols-2">
-          <select value={patientFilter} onChange={(e) => setPatientFilter(e.target.value)} className="app-select">
-            <option value="ALL">כל המטופלים</option>
-            <option value="GENERAL">משימות כלליות</option>
-            {patients.map((patient) => (
-              <option key={patient.id} value={patient.id}>{patient.name}</option>
-            ))}
-          </select>
-          <select value={scopeFilter} onChange={(e) => setScopeFilter(e.target.value as ScopeFilter)} className="app-select">
-            <option value="ALL">כל המשימות</option>
-            <option value="OPEN">פתוחות</option>
-            <option value="THIS_WEEK">לשבוע הנוכחי</option>
-            <option value="DONE">בוצעו</option>
-            <option value="CANCELED">בוטלו</option>
-          </select>
+          <CustomSelect
+            value={patientFilter}
+            onChange={setPatientFilter}
+            options={[
+              { value: "ALL", label: "כל המטופלים" },
+              { value: "GENERAL", label: "משימות כלליות" },
+              ...patients.map((patient) => ({ value: patient.id, label: patient.name })),
+            ]}
+            searchable
+          />
+          <CustomSelect
+            value={scopeFilter}
+            onChange={(v) => setScopeFilter(v as ScopeFilter)}
+            options={[
+              { value: "ALL", label: "כל המשימות" },
+              { value: "OPEN", label: "פתוחות" },
+              { value: "THIS_WEEK", label: "לשבוע הנוכחי" },
+              { value: "DONE", label: "בוצעו" },
+              { value: "CANCELED", label: "בוטלו" },
+            ]}
+          />
         </div>
       </section>
 

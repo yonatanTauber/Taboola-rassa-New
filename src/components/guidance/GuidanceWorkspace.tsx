@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type GuidanceRow = {
   id: string;
@@ -103,19 +104,13 @@ export function GuidanceWorkspace({
       <section className="app-section space-y-2">
         <h2 className="text-sm font-semibold">יצירת הדרכה חדשה</h2>
         <div className="grid gap-2 md:grid-cols-5">
-          <select
+          <CustomSelect
             value={newPatientId}
-            onChange={(e) => setNewPatientId(e.target.value)}
-            className="app-select"
-            aria-label="בחירת מטופל להדרכה חדשה"
-          >
-            <option value="">בחר מטופל (חובה)</option>
-            {patients.map((patient) => (
-              <option key={patient.id} value={patient.id}>
-                {patient.name}
-              </option>
-            ))}
-          </select>
+            onChange={setNewPatientId}
+            options={patients.map((patient) => ({ value: patient.id, label: patient.name }))}
+            placeholder="בחר מטופל (חובה)"
+            searchable
+          />
 
           <input
             value={newTitle}
@@ -125,19 +120,16 @@ export function GuidanceWorkspace({
             aria-label="כותרת הדרכה"
           />
 
-          <select
+          <CustomSelect
             value={newInstructorId}
-            onChange={(e) => setNewInstructorId(e.target.value)}
-            className="app-select"
-            aria-label="בחירת מדריך"
-          >
-            <option value="">ללא מדריך</option>
-            {instructors.map((instructor) => (
-              <option key={instructor.id} value={instructor.id}>
-                {instructor.fullName}
-              </option>
-            ))}
-          </select>
+            onChange={setNewInstructorId}
+            options={[
+              { value: "", label: "ללא מדריך" },
+              ...instructors.map((instructor) => ({ value: instructor.id, label: instructor.fullName })),
+            ]}
+            placeholder="ללא מדריך"
+            searchable
+          />
 
           <input
             type="number"
@@ -179,37 +171,47 @@ export function GuidanceWorkspace({
             aria-label="חיפוש הדרכות"
           />
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="app-select" aria-label="סינון לפי סטטוס">
-            <option value="ALL">כל הסטטוסים</option>
-            <option value="ACTIVE">פעילה</option>
-            <option value="COMPLETED">הושלמה</option>
-          </select>
+          <CustomSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: "ALL", label: "כל הסטטוסים" },
+              { value: "ACTIVE", label: "פעילה" },
+              { value: "COMPLETED", label: "הושלמה" },
+            ]}
+          />
 
-          <select value={patientFilter} onChange={(e) => setPatientFilter(e.target.value)} className="app-select" aria-label="סינון לפי מטופל">
-            <option value="ALL">כל המטופלים</option>
-            {patients.map((patient) => (
-              <option key={patient.id} value={patient.id}>
-                {patient.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={patientFilter}
+            onChange={setPatientFilter}
+            options={[
+              { value: "ALL", label: "כל המטופלים" },
+              ...patients.map((patient) => ({ value: patient.id, label: patient.name })),
+            ]}
+            searchable
+          />
 
-          <select value={instructorFilter} onChange={(e) => setInstructorFilter(e.target.value)} className="app-select" aria-label="סינון לפי מדריך">
-            <option value="ALL">כל המדריכים</option>
-            <option value="NONE">ללא מדריך</option>
-            {instructors.map((instructor) => (
-              <option key={instructor.id} value={instructor.id}>
-                {instructor.fullName}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={instructorFilter}
+            onChange={setInstructorFilter}
+            options={[
+              { value: "ALL", label: "כל המדריכים" },
+              { value: "NONE", label: "ללא מדריך" },
+              ...instructors.map((instructor) => ({ value: instructor.id, label: instructor.fullName })),
+            ]}
+            searchable
+          />
 
-          <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)} className="app-select" aria-label="מיון">
-            <option value="UPDATED_DESC">מיון: עודכן לאחרונה</option>
-            <option value="TITLE_ASC">מיון: כותרת א-ב</option>
-            <option value="FEE_DESC">מיון: עלות גבוהה לנמוכה</option>
-            <option value="COMPLETED_AT">מיון: הושלמו בראש</option>
-          </select>
+          <CustomSelect
+            value={sortMode}
+            onChange={(v) => setSortMode(v as SortMode)}
+            options={[
+              { value: "UPDATED_DESC", label: "מיון: עודכן לאחרונה" },
+              { value: "TITLE_ASC", label: "מיון: כותרת א-ב" },
+              { value: "FEE_DESC", label: "מיון: עלות גבוהה לנמוכה" },
+              { value: "COMPLETED_AT", label: "מיון: הושלמו בראש" },
+            ]}
+          />
         </div>
 
         <div className="overflow-x-auto">

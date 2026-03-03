@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type Row = {
   id: string;
@@ -80,7 +81,7 @@ export function PatientsTable({
   archivedMode?: boolean;
   displayMode?: DisplayMode;
 }) {
-  const [q, setQ] = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [genderFilters, setGenderFilters] = useState<Record<GenderFilterKey, boolean>>(DEFAULT_GENDER_FILTERS);
   const [ageGroupFilters, setAgeGroupFilters] = useState<Record<AgeGroupFilterKey, boolean>>(DEFAULT_AGE_GROUP_FILTERS);
@@ -89,15 +90,12 @@ export function PatientsTable({
   const columns = archivedMode ? ARCHIVED_COLUMNS : ACTIVE_COLUMNS;
 
   const filtered = useMemo(() => {
-    const searchText = q.trim().toLowerCase();
-
     const base = rows.filter((r) => {
       const genderKey = normalizeGender(r.gender);
       if (!genderFilters[genderKey]) return false;
       if (!ageGroupFilters[r.ageGroup]) return false;
-      if (!searchText) return true;
-      const text = `${r.firstName} ${r.lastName} ${r.phone ?? ""} ${r.email}`.toLowerCase();
-      return text.includes(searchText);
+      if (selectedPatientId && r.id !== selectedPatientId) return false;
+      return true;
     });
 
     const sorted = [...base];
@@ -106,7 +104,7 @@ export function PatientsTable({
       return sortDirection === "ASC" ? result : -result;
     });
     return sorted;
-  }, [rows, q, genderFilters, ageGroupFilters, sortKey, sortDirection]);
+  }, [rows, selectedPatientId, genderFilters, ageGroupFilters, sortKey, sortDirection]);
 
   const selectedFiltersCount =
     Object.values(genderFilters).filter(Boolean).length +
@@ -165,12 +163,18 @@ export function PatientsTable({
   return (
     <section className="app-section">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="חיפוש חופשי"
-          className="app-field min-w-44 flex-1"
-        />
+        <div className="min-w-44 flex-1">
+          <CustomSelect
+            value={selectedPatientId}
+            onChange={setSelectedPatientId}
+            options={[
+              { value: "", label: "כל המטופלים" },
+              ...rows.map((r) => ({ value: r.id, label: `${r.firstName} ${r.lastName}` })),
+            ]}
+            placeholder="בחר/י מטופל"
+            searchable
+          />
+        </div>
         <button
           type="button"
           onClick={() => setFiltersOpen((prev) => !prev)}

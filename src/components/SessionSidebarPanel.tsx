@@ -5,6 +5,7 @@ import { useState } from "react";
 import { EntityLink } from "@/components/EntityLink";
 import { SessionReceiptsPager } from "@/components/SessionReceiptsPager";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type TaskRow = {
   id: string;
@@ -477,17 +478,17 @@ export function SessionSidebarPanel({
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted">סוג מסמך</span>
-                    <select
+                    <CustomSelect
                       value={medDocKind}
-                      onChange={(e) => setMedDocKind(e.target.value)}
-                      className="app-select"
-                    >
-                      <option value="OTHER">אחר</option>
-                      <option value="EVALUATION">הערכה</option>
-                      <option value="TEST_RESULT">תוצאות בדיקה</option>
-                      <option value="HOSPITAL_SUMMARY">סיכום אשפוז</option>
-                      <option value="REFERRAL">הפניה</option>
-                    </select>
+                      onChange={setMedDocKind}
+                      options={[
+                        { value: "OTHER", label: "אחר" },
+                        { value: "EVALUATION", label: "הערכה" },
+                        { value: "TEST_RESULT", label: "תוצאות בדיקה" },
+                        { value: "HOSPITAL_SUMMARY", label: "סיכום אשפוז" },
+                        { value: "REFERRAL", label: "הפניה" },
+                      ]}
+                    />
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted">קישור לקובץ (URL)</span>

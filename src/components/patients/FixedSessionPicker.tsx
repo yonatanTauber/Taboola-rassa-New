@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CustomSelect } from "@/components/CustomSelect";
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
@@ -45,60 +46,46 @@ export function FixedSessionPicker({
       <div className="grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <label className="space-y-1">
           <span className="text-xs text-muted">יום קבוע</span>
-          <select
+          <CustomSelect
             value={day}
-            onChange={(event) => {
-              const nextDay = event.target.value;
+            onChange={(nextDay) => {
               setDay(nextDay);
               if (!nextDay) {
                 setHour("");
                 setMinute("");
               }
             }}
-            className="app-select"
-          >
-            {DAY_OPTIONS.map((option) => (
-              <option key={option.value || "none"} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={DAY_OPTIONS}
+            placeholder="ללא יום קבוע"
+          />
         </label>
 
         <label className="space-y-1">
           <span className="text-xs text-muted">זמן התחלה - שעה</span>
-          <select
+          <CustomSelect
             value={hour}
-            onChange={(event) => setHour(event.target.value)}
-            className="app-select"
+            onChange={setHour}
+            options={[
+              { value: "", label: "שעה" },
+              ...HOURS.map((value) => ({ value, label: value })),
+            ]}
+            placeholder="שעה"
             disabled={!hasDay}
-            aria-label="שעה קבועה"
-          >
-            <option value="">שעה</option>
-            {HOURS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          />
         </label>
 
         <label className="space-y-1">
           <span className="text-xs text-muted">זמן התחלה - דקות</span>
-          <select
+          <CustomSelect
             value={minute}
-            onChange={(event) => setMinute(event.target.value)}
-            className="app-select"
+            onChange={setMinute}
+            options={[
+              { value: "", label: "דקות" },
+              ...MINUTES.map((value) => ({ value, label: value })),
+            ]}
+            placeholder="דקות"
             disabled={!hasDay}
-            aria-label="דקות קבועות"
-          >
-            <option value="">דקות</option>
-            {MINUTES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          />
         </label>
 
         <label className="space-y-1">

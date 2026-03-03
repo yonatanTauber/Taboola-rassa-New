@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EntityLink } from "@/components/EntityLink";
 import { PatientProfileEditor } from "@/components/patients/PatientProfileEditor";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type FigureRow = { id: string; name: string; role?: string };
 type ConceptLinkRow = { id: string; label: string; href: string | null };
@@ -578,11 +579,11 @@ export function PatientAdditionalGrid({
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted">קשר</span>
-                    <select value={figureRole} onChange={(e) => setFigureRole(e.target.value)} className="app-select">
-                      {Object.entries(FIGURE_ROLE_LABELS).map(([val, lbl]) => (
-                        <option key={val} value={val}>{lbl}</option>
-                      ))}
-                    </select>
+                    <CustomSelect
+                      value={figureRole}
+                      onChange={setFigureRole}
+                      options={Object.entries(FIGURE_ROLE_LABELS).map(([val, lbl]) => ({ value: val, label: lbl }))}
+                    />
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted">הערות (אופציונלי)</span>
@@ -662,11 +663,11 @@ export function PatientAdditionalGrid({
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted">סוג מסמך</span>
-                    <select value={docKind} onChange={(e) => setDocKind(e.target.value)} className="app-select">
-                      {Object.entries(DOC_KIND_LABELS).map(([val, lbl]) => (
-                        <option key={val} value={val}>{lbl}</option>
-                      ))}
-                    </select>
+                    <CustomSelect
+                      value={docKind}
+                      onChange={setDocKind}
+                      options={Object.entries(DOC_KIND_LABELS).map(([val, lbl]) => ({ value: val, label: lbl }))}
+                    />
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted">קישור לקובץ / URL</span>

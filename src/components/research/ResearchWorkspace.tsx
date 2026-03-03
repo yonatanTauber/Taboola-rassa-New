@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { EntityBadge } from "@/components/EntityBadge";
 import { EntityLink } from "@/components/EntityLink";
 import { ResearchUploadPanel } from "@/components/research/ResearchUploadPanel";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type Doc = {
   id: string;
@@ -148,26 +149,36 @@ export function ResearchWorkspace({
       <section className="app-section">
         <div className="grid gap-2 md:grid-cols-4">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש חופשי… לדוגמה: חרדה, CBT" className="app-field" aria-label="חיפוש במקורות" name="q" autoComplete="off" />
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className="app-select" aria-label="סינון לפי סוג מקור" name="kind" autoComplete="off">
-            <option value="ALL">כל סוגי המקורות</option>
-            <option value="ARTICLE">מאמר</option>
-            <option value="BOOK">ספר</option>
-            <option value="VIDEO">סרטון</option>
-            <option value="LECTURE_NOTE">הרצאה / סיכום</option>
-            <option value="OTHER">אחר</option>
-          </select>
-          <select value={topic} onChange={(e) => setTopic(e.target.value)} className="app-select" aria-label="סינון לפי נושא" name="topic" autoComplete="off">
-            <option value="ALL">כל הנושאים</option>
-            {topicOptions.map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
-          </select>
-          <select value={author} onChange={(e) => setAuthor(e.target.value)} className="app-select" aria-label="סינון לפי כותב" name="author" autoComplete="off">
-            <option value="ALL">כל הכותבים</option>
-            {authorOptions.map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
-          </select>
+          <CustomSelect
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: "ALL", label: "כל סוגי המקורות" },
+              { value: "ARTICLE", label: "מאמר" },
+              { value: "BOOK", label: "ספר" },
+              { value: "VIDEO", label: "סרטון" },
+              { value: "LECTURE_NOTE", label: "הרצאה / סיכום" },
+              { value: "OTHER", label: "אחר" },
+            ]}
+          />
+          <CustomSelect
+            value={topic}
+            onChange={setTopic}
+            options={[
+              { value: "ALL", label: "כל הנושאים" },
+              ...topicOptions.map((item) => ({ value: item, label: item })),
+            ]}
+            searchable
+          />
+          <CustomSelect
+            value={author}
+            onChange={setAuthor}
+            options={[
+              { value: "ALL", label: "כל הכותבים" },
+              ...authorOptions.map((item) => ({ value: item, label: item })),
+            ]}
+            searchable
+          />
         </div>
       </section>
 

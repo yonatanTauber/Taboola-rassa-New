@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
-import { FixedSessionPicker } from "@/components/patients/FixedSessionPicker";
 import { requireCurrentUserId } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 import { generateUpcomingSessions } from "@/lib/recurring-sessions";
+import { NewPatientForm } from "@/components/patients/NewPatientForm";
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, step) => String(step * 5).padStart(2, "0"));
@@ -21,10 +20,6 @@ const AVATAR_KEYS = [
   "neutral-1",
   "neutral-2",
 ];
-
-function toDateInput(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
 
 function parseDateInput(raw: string) {
   if (!raw) return null;
@@ -194,82 +189,12 @@ export default async function NewPatientPage({
 }) {
   const query = await searchParams;
   const error = errorText(query.error);
-  const defaultTreatmentStartDate = toDateInput(new Date());
   return (
     <main className="space-y-4">
       <BackButton fallback="/patients" />
       <section className="rounded-2xl border border-black/10 bg-white p-4">
         <h1 className="mb-3 text-xl font-semibold">מטופל חדש</h1>
-        {error ? (
-          <div className="mb-3 rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger">
-            {error}
-          </div>
-        ) : null}
-        <form action={createPatient} className="space-y-4">
-          <div className="grid gap-2 md:grid-cols-2">
-            <input required name="firstName" placeholder="שם פרטי *" className="app-field" />
-            <input required name="lastName" placeholder="שם משפחה *" className="app-field" />
-            <select name="gender" defaultValue="" className="app-select">
-              <option value="" disabled className="text-muted">
-                מגדר (אופציונלי)
-              </option>
-              <option value="MALE">גבר</option>
-              <option value="FEMALE">אישה</option>
-              <option value="OTHER">אחר</option>
-            </select>
-            <input name="phone" placeholder="טלפון ליצירת קשר (אופציונלי)" className="app-field" />
-            <input name="email" placeholder="אימייל" className="app-field" />
-            <label className="space-y-1">
-              <div className="text-xs text-muted">תאריך לידה</div>
-              <input name="dateOfBirth" type="date" lang="he-IL" className="app-field" />
-            </label>
-            <div className="space-y-2 md:col-span-2 md:grid md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-start md:gap-2">
-              <label className="space-y-1">
-                <div className="text-xs text-muted">תאריך התחלת טיפול</div>
-                <input
-                  name="treatmentStartDate"
-                  type="date"
-                  lang="he-IL"
-                  defaultValue={defaultTreatmentStartDate}
-                  className="app-field"
-                />
-              </label>
-
-              <div className="space-y-1">
-                <div className="text-xs text-muted">יום ושעה קבועים (אופציונלי)</div>
-                <FixedSessionPicker />
-              </div>
-            </div>
-            <input
-              name="defaultSessionFeeNis"
-              type="number"
-              min="0"
-              placeholder="מחיר טיפול קבוע (₪)"
-              className="app-field"
-            />
-          </div>
-
-          <div className="rounded-xl border border-black/10 p-3">
-            <h2 className="mb-2 text-sm font-semibold">אינטייק</h2>
-            <div className="grid gap-2">
-              <input name="referralReason" placeholder="סיבת פנייה" className="app-field" />
-              <textarea name="goals" placeholder="מטרות טיפול" className="app-textarea min-h-20" />
-              <input name="previousTherapy" placeholder="טיפול קודם" className="app-field" />
-              <input name="currentMedication" placeholder="טיפול תרופתי" className="app-field" />
-              <input name="hospitalizations" placeholder="אשפוזים בעבר" className="app-field" />
-              <textarea name="freeText" placeholder="מלל חופשי" className="app-textarea min-h-24" />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Link href="/patients" className="app-btn app-btn-secondary">
-              ביטול
-            </Link>
-            <button className="app-btn app-btn-primary">
-              שמור
-            </button>
-          </div>
-        </form>
+        <NewPatientForm action={createPatient} error={error} />
       </section>
     </main>
   );

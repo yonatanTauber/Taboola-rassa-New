@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { HebrewDateInput } from "@/components/HebrewDateInput";
 import { useQuickActions } from "@/components/QuickActions";
+import { CustomSelect } from "@/components/CustomSelect";
 
 type TaskPayload = {
   id: string;
@@ -79,31 +80,31 @@ export function TaskEditor({
         className="app-textarea min-h-20"
       />
 
-      <select
+      <CustomSelect
         value={form.patientId}
-        onChange={(e) => setForm((prev) => ({ ...prev, patientId: e.target.value }))}
-        className="app-select"
-      >
-        <option value="">כללי לקליניקה</option>
-        {patients.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
+        onChange={(v) => setForm((prev) => ({ ...prev, patientId: v }))}
+        options={[
+          { value: "", label: "כללי לקליניקה" },
+          ...patients.map((p) => ({ value: p.id, label: p.name })),
+        ]}
+        placeholder="כללי לקליניקה"
+        searchable
+      />
       <div className="grid grid-cols-1 gap-2">
         <HebrewDateInput
           value={form.dueAt}
           onChange={(next) => setForm((prev) => ({ ...prev, dueAt: next }))}
         />
       </div>
-      <select
+      <CustomSelect
         value={form.status}
-        onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-        className="app-select"
-      >
-        <option value="OPEN">פתוחה</option>
-        <option value="DONE">בוצעה</option>
-        <option value="CANCELED">בוטלה</option>
-      </select>
+        onChange={(v) => setForm((prev) => ({ ...prev, status: v }))}
+        options={[
+          { value: "OPEN", label: "פתוחה" },
+          { value: "DONE", label: "בוצעה" },
+          { value: "CANCELED", label: "בוטלה" },
+        ]}
+      />
 
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => setDeleteOpen(true)} className="app-btn app-btn-secondary text-danger" disabled={saving}>
