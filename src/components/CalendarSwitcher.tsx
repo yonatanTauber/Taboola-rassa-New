@@ -42,9 +42,11 @@ type DragItem =
 export function CalendarSwitcher({
   sessions: initialSessions,
   tasks: initialTasks,
+  bare = false,
 }: {
   sessions: CalendarSession[];
   tasks: CalendarTask[];
+  bare?: boolean;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<ViewMode>("week");
@@ -273,8 +275,11 @@ export function CalendarSwitcher({
   // Require 5px movement before a drag starts — lets clicks pass through normally
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  const Wrapper = bare ? "div" : "section";
+  const wrapperClass = bare ? "" : "app-section";
+
   return (
-    <section className="app-section">
+    <Wrapper className={wrapperClass}>
       {/* Header: title + nav arrows + mode switcher */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">יומן</h2>
@@ -361,7 +366,7 @@ export function CalendarSwitcher({
           )}
         </div>
       )}
-    </section>
+    </Wrapper>
   );
 }
 

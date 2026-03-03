@@ -159,95 +159,97 @@ export default async function Home() {
   const displayName = firstNameFromFullName(currentUser?.fullName);
 
   return (
-    <main className="flex flex-col gap-3">
-      <section className="app-section flex flex-col gap-2">
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div className="order-1 space-y-3 lg:order-1">
-            <p className="text-sm text-muted">{new Date().toLocaleDateString("he-IL")} · מרכז קליניקה</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-ink">
-              {displayName ? `${greeting}, ${displayName}` : greeting}
-            </h1>
-            <p className="text-sm text-muted">תצפית יומית על פגישות, משימות, הכנסות ותיעוד.</p>
-            <div className="pt-2">
-              <div className="text-sm text-muted">מעבר מהיר למטופל</div>
-              <div className="mt-2 max-w-[280px]">
-                <PatientQuickJump patients={patients.map((p) => ({ id: p.id, name: formatPatientName(p.firstName, p.lastName) }))} />
-              </div>
+    <main className="flex flex-col gap-5">
+      {/* Header: greeting + stats + insight — no card, flows inside surface-card */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <div className="space-y-3">
+          <p className="text-sm text-muted">{new Date().toLocaleDateString("he-IL")} · מרכז קליניקה</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">
+            {displayName ? `${greeting}, ${displayName}` : greeting}
+          </h1>
+          <p className="text-sm text-muted">תצפית יומית על פגישות, משימות, הכנסות ותיעוד.</p>
+          <div className="pt-1">
+            <div className="mb-1.5 text-xs font-medium text-muted">מעבר מהיר למטופל</div>
+            <div className="max-w-[280px]">
+              <PatientQuickJump patients={patients.map((p) => ({ id: p.id, name: formatPatientName(p.firstName, p.lastName) }))} />
             </div>
-          </div>
-          <div className="order-2 space-y-3 lg:order-2">
-            <div className="flex flex-wrap items-start gap-2">
-              <MiniStat label="מטופלים פעילים" value={patientCount} href="/patients" hoverLabel="מעבר לרשימת מטופלים" />
-              <MiniStat label="משימות פתוחות" value={openTasksCount} href="/tasks" hoverLabel="מעבר למשימות פתוחות" />
-              <MiniStat label="ביטולים מאוחרים" value={lateCanceledCount} href="/sessions" hoverLabel="מעבר לביטולים מאוחרים" />
-            </div>
-            <Link href={insight.href} className="block rounded-2xl border border-accent/25 bg-gradient-to-br from-white via-accent-soft/60 to-accent-soft px-4 py-4 text-sm text-accent shadow-sm transition hover:shadow-md hover:border-accent/40">
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-accent/70">
-                <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent/10 text-accent">✦</span>
-                תובנה יומית
-              </div>
-              <div className="font-medium text-ink">{insight.text}</div>
-              <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">{insight.cta} ←</div>
-            </Link>
           </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <section className="app-section">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">פגישות היום</h2>
-              <QuickActionButton
-                action="session"
-                label="פגישה"
-                className="app-btn app-btn-secondary text-xs"
-              />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-start gap-2">
+            <MiniStat label="מטופלים פעילים" value={patientCount} href="/patients" hoverLabel="מעבר לרשימת מטופלים" />
+            <MiniStat label="משימות פתוחות" value={openTasksCount} href="/tasks" hoverLabel="מעבר למשימות פתוחות" />
+            <MiniStat label="ביטולים מאוחרים" value={lateCanceledCount} href="/sessions" hoverLabel="מעבר לביטולים מאוחרים" />
+          </div>
+          <Link href={insight.href} className="block rounded-2xl border border-accent/25 bg-gradient-to-br from-white via-accent-soft/60 to-accent-soft px-4 py-4 text-sm shadow-sm transition hover:shadow-md hover:border-accent/40">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-accent/70">
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent/10 text-accent">✦</span>
+              תובנה יומית
             </div>
-            {todaySessions.length > 0 ? (
-              <ul className="space-y-2">
-                {todaySessions.map((session) => (
-                  <li key={session.id}>
-                    <Link href={`/sessions/${session.id}`} className="grid grid-cols-[90px_1fr_auto] items-center gap-3 rounded-xl border border-black/8 bg-white px-3 py-2 hover:bg-black/[0.02]">
-                      <div className="font-mono tabular-nums text-sm text-muted">{fmtTime(session.scheduledAt)}</div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-ink">{formatPatientName(session.patient.firstName, session.patient.lastName)}</div>
-                        <div className={`text-xs ${billingTone(session.feeNis ?? 0, session.paymentAllocations.reduce((sum, p) => sum + p.amountNis, 0))}`}>
-                          {billingLabel(session.feeNis ?? 0, session.paymentAllocations.reduce((sum, p) => sum + p.amountNis, 0))}
-                        </div>
+            <div className="font-medium text-ink">{insight.text}</div>
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">{insight.cta} ←</div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Today cards */}
+      <div className="grid gap-3 md:grid-cols-2">
+        <section className="app-section">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-ink">פגישות היום</h2>
+            <QuickActionButton
+              action="session"
+              label="פגישה"
+              className="app-btn app-btn-secondary text-xs"
+            />
+          </div>
+          {todaySessions.length > 0 ? (
+            <ul className="space-y-2">
+              {todaySessions.map((session) => (
+                <li key={session.id}>
+                  <Link href={`/sessions/${session.id}`} className="grid grid-cols-[90px_1fr_auto] items-center gap-3 rounded-xl border border-black/8 bg-white px-3 py-2 hover:bg-black/[0.02]">
+                    <div className="font-mono tabular-nums text-sm text-muted">{fmtTime(session.scheduledAt)}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-ink">{formatPatientName(session.patient.firstName, session.patient.lastName)}</div>
+                      <div className={`text-xs ${billingTone(session.feeNis ?? 0, session.paymentAllocations.reduce((sum, p) => sum + p.amountNis, 0))}`}>
+                        {billingLabel(session.feeNis ?? 0, session.paymentAllocations.reduce((sum, p) => sum + p.amountNis, 0))}
                       </div>
-                      <StatusBadge status={session.status} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-sm text-muted">אין פגישות מתוכננות להיום.</p>}
-          </section>
+                    </div>
+                    <StatusBadge status={session.status} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-muted">אין פגישות מתוכננות להיום.</p>}
+        </section>
 
-          <section className="app-section">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">משימות להיום</h2>
-              <QuickActionButton
-                action="task"
-                label="משימה"
-                className="app-btn app-btn-secondary text-xs"
-              />
-            </div>
-            {todayTasks.length > 0 ? (
-              <TaskChecklist
-                tasks={todayTasks.map((task) => ({
-                  id: task.id,
-                  title: task.title,
-                  patientName: task.patient?.firstName,
-                  dueLabel: task.dueAt?.toLocaleDateString("he-IL"),
-                  href: task.sessionId ? `/sessions/${task.sessionId}` : `/tasks/${task.id}`,
-                }))}
-              />
-            ) : <p className="text-sm text-muted">אין משימות פתוחות להיום.</p>}
-          </section>
-        </div>
+        <section className="app-section">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-ink">משימות להיום</h2>
+            <QuickActionButton
+              action="task"
+              label="משימה"
+              className="app-btn app-btn-secondary text-xs"
+            />
+          </div>
+          {todayTasks.length > 0 ? (
+            <TaskChecklist
+              tasks={todayTasks.map((task) => ({
+                id: task.id,
+                title: task.title,
+                patientName: task.patient?.firstName,
+                dueLabel: task.dueAt?.toLocaleDateString("he-IL"),
+                href: task.sessionId ? `/sessions/${task.sessionId}` : `/tasks/${task.id}`,
+              }))}
+            />
+          ) : <p className="text-sm text-muted">אין משימות פתוחות להיום.</p>}
+        </section>
+      </div>
 
-        <div className="grid gap-3">
-          <CalendarSwitcher sessions={calendarViewModel} tasks={calendarTasksModel} />
-        </div>
-      </section>
+      {/* Calendar — part of the same flow, no extra card wrapper */}
+      <div className="border-t border-black/8 pt-1">
+        <CalendarSwitcher sessions={calendarViewModel} tasks={calendarTasksModel} bare />
+      </div>
     </main>
   );
 }
